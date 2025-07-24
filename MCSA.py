@@ -2,6 +2,7 @@ import re
 import time
 import os
 import sys
+import json
 import tkinter as tk
 import openpyxl
 from tkinter import Tk, filedialog, simpledialog, messagebox
@@ -13,38 +14,83 @@ from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
 
+json_file = "products.json"
 
-# List of product URLs to check
-product_urls = ['https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply',
- 'https://www.microcenter.com/product/695232/asus-rog-strix-1200-watt-80-plus-platinum-atx-fully-modular-power-supply-atx-31-compatible',
- 'https://www.microcenter.com/product/664884/asus-rog-loki-1000-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-black-atx-30-compatible',
- 'https://www.microcenter.com/product/664885/asus-rog-loki-850-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-white-atx-30-compatible',
- 'https://www.microcenter.com/product/664883/asus-rog-loki-850-watt-80-plus-gold-sfx-l-fully-modular-power-supply-black-atx-30-compatible',
- 'https://www.microcenter.com/product/669273/asus-rog-strix-gold-aura-edition-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/669274/asus-rog-strix-gold-aura-edition-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/676964/asus-tuf-gaming-1200-watt-80-plus-gold-atx-fully-modular-power-supply',
- 'https://www.microcenter.com/product/665308/asus-tuf-gaming-1000-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/665319/asus-tuf-gaming-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/665320/asus-tuf-gaming-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/675843/asus-prime-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/675842/asus-prime-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
- 'https://www.microcenter.com/product/690065/asus-asus-rog-ryuyjin-iii-360-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-white',
- 'https://www.microcenter.com/product/690066/asus-rog-ryujin-iii-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-black',
- 'https://www.microcenter.com/product/668461/asus-rog-ryujin-iii-360mm-all-in-one-liquid-cpu-cooling-kit',
- 'https://www.microcenter.com/product/678856/asus-proart-lc-420mm-all-in-one-liquid-cpu-cooling-kit-black',
- 'https://www.microcenter.com/product/664435/asus-asus-rog-hyperion-gr701-tempered-glass-eatx-full-tower-computer-case-black',
- 'https://www.microcenter.com/product/625183/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-white-edition',
- 'https://www.microcenter.com/product/609942/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-black',
- 'https://www.microcenter.com/product/676302/asus-proart-pa602-tempered-glass-eatx-mid-tower-computer-case-black',
- 'https://www.microcenter.com/product/690056/asus-proart-pa401-wood-edition-tempered-glass-atx-mid-tower-computer-case-black',
- 'https://www.microcenter.com/product/662252/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-black',
- 'https://www.microcenter.com/product/662254/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-white',
- 'https://www.microcenter.com/product/601243/asus-tuf-gaming-gt501-rgb-tempered-glass-atx-mid-tower-computer-case',
- 'https://www.microcenter.com/product/679946/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-black',
- 'https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white',
- 'https://www.microcenter.com/product/690543/asus-a31-plus-tempered-glass-atx-mid-tower-computer-case-black',
- 'https://www.microcenter.com/product/651914/asus-prime-ap201-microatx-mini-tower-computer-case-black',
- 'https://www.microcenter.com/product/651917/asus-prime-ap201-microatx-mini-tower-computer-case-white']
+# Load product list
+if os.path.exists(json_file):
+    with open(json_file, "r") as f:
+        data = json.load(f)
+        model_names = data.get("model_names", [])
+        product_urls = data.get("product_urls", [])
+else:
+    # Model names
+    model_names = ['ROG-THOR-1000P2-GAMING',
+                    'ROG-STRIX-1200P-GAMING',
+                    'ROG-LOKI-1000P-SFX-L-GAMING',
+                    'ROG-LOKI-850P-WHITE-SFX-L-GAMING',
+                    'ROG-LOKI-850P-SFX-L-GAMING',
+                    'ROG-STRIX-850G-AURA-GAMING',
+                    'ROG-STRIX-750G-AURA-GAMING',
+                    'TUF-GAMING-1200G',
+                    'TUF-GAMING-1000G',
+                    'TUF-GAMING-850G',
+                    'TUF-GAMING-750G',
+                    'AP-850G',
+                    'AP-750G',
+                    'ROG RYUJIN III 360 ARGB EXTREME WHT',
+                    'ROG RYUJIN III 360 ARGB EXTREME',
+                    'ROG RYUJIN III 360',
+                    'ProArt LC 420',
+                    'GR701 ROG HYPERION',
+                    'GX601 ROG STRIX HELIOS CASE/WT/AL/WITH HANDLE',
+                    'GX601 ROG STRIX HELIOS CASE/BK/AL/WITH HANDLE',
+                    'PA602 ProArt Case',
+                    'PROART PA401 WOOD TG PWM BLACK',
+                    'GT502 TUF GAMING CASE/BLK',
+                    'GT502 TUF GAMING CASE/WHT',
+                    'GT501 TUF GAMING CASE/GRY/WITH HANDLE',
+                    'TUF GAMING GT302 ARGB BLACK',
+                    'TUF GAMING GT302 ARGB  WHT',
+                    'A31 PLUS/BK/TG/ARGB// ',
+                    'AP201 ASUS PRIME CASE MESH',
+                    'AP201 ASUS PRIME CASE MESH WHITE EDITION']
+    
+    # List of product URLs to check
+    product_urls = ['https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply',
+                    'https://www.microcenter.com/product/695232/asus-rog-strix-1200-watt-80-plus-platinum-atx-fully-modular-power-supply-atx-31-compatible',
+                    'https://www.microcenter.com/product/664884/asus-rog-loki-1000-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-black-atx-30-compatible',
+                    'https://www.microcenter.com/product/664885/asus-rog-loki-850-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-white-atx-30-compatible',
+                    'https://www.microcenter.com/product/664883/asus-rog-loki-850-watt-80-plus-gold-sfx-l-fully-modular-power-supply-black-atx-30-compatible',
+                    'https://www.microcenter.com/product/669273/asus-rog-strix-gold-aura-edition-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/669274/asus-rog-strix-gold-aura-edition-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/676964/asus-tuf-gaming-1200-watt-80-plus-gold-atx-fully-modular-power-supply',
+                    'https://www.microcenter.com/product/665308/asus-tuf-gaming-1000-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/665319/asus-tuf-gaming-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/665320/asus-tuf-gaming-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/675843/asus-prime-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/675842/asus-prime-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
+                    'https://www.microcenter.com/product/690065/asus-asus-rog-ryuyjin-iii-360-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-white',
+                    'https://www.microcenter.com/product/690066/asus-rog-ryujin-iii-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-black',
+                    'https://www.microcenter.com/product/668461/asus-rog-ryujin-iii-360mm-all-in-one-liquid-cpu-cooling-kit',
+                    'https://www.microcenter.com/product/678856/asus-proart-lc-420mm-all-in-one-liquid-cpu-cooling-kit-black',
+                    'https://www.microcenter.com/product/664435/asus-asus-rog-hyperion-gr701-tempered-glass-eatx-full-tower-computer-case-black',
+                    'https://www.microcenter.com/product/625183/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-white-edition',
+                    'https://www.microcenter.com/product/609942/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-black',
+                    'https://www.microcenter.com/product/676302/asus-proart-pa602-tempered-glass-eatx-mid-tower-computer-case-black',
+                    'https://www.microcenter.com/product/690056/asus-proart-pa401-wood-edition-tempered-glass-atx-mid-tower-computer-case-black',
+                    'https://www.microcenter.com/product/662252/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-black',
+                    'https://www.microcenter.com/product/662254/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-white',
+                    'https://www.microcenter.com/product/601243/asus-tuf-gaming-gt501-rgb-tempered-glass-atx-mid-tower-computer-case',
+                    'https://www.microcenter.com/product/679946/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-black',
+                    'https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white',
+                    'https://www.microcenter.com/product/690543/asus-a31-plus-tempered-glass-atx-mid-tower-computer-case-black',
+                    'https://www.microcenter.com/product/651914/asus-prime-ap201-microatx-mini-tower-computer-case-black',
+                    'https://www.microcenter.com/product/651917/asus-prime-ap201-microatx-mini-tower-computer-case-white']
+    
+def save_products():
+    with open(json_file, "w") as f:
+        json.dump({"model_names": model_names, "product_urls": product_urls}, f, indent=2)
+
 
 # Mapping of store ID to store name (must match Excel header format)
 store_map = {
@@ -56,54 +102,10 @@ store_map = {
     "131": "Dallas", "081": "Fairfax"
 }
 
-# Model names
-model_names = ['ROG-THOR-1000P2-GAMING',
- 'ROG-STRIX-1200P-GAMING',
- 'ROG-LOKI-1000P-SFX-L-GAMING',
- 'ROG-LOKI-850P-WHITE-SFX-L-GAMING',
- 'ROG-LOKI-850P-SFX-L-GAMING',
- 'ROG-STRIX-850G-AURA-GAMING',
- 'ROG-STRIX-750G-AURA-GAMING',
- 'TUF-GAMING-1200G',
- 'TUF-GAMING-1000G',
- 'TUF-GAMING-850G',
- 'TUF-GAMING-750G',
- 'AP-850G',
- 'AP-750G',
- 'ROG RYUJIN III 360 ARGB EXTREME WHT',
- 'ROG RYUJIN III 360 ARGB EXTREME',
- 'ROG RYUJIN III 360',
- 'ProArt LC 420',
- 'GR701 ROG HYPERION',
- 'GX601 ROG STRIX HELIOS CASE/WT/AL/WITH HANDLE',
- 'GX601 ROG STRIX HELIOS CASE/BK/AL/WITH HANDLE',
- 'PA602 ProArt Case',
- 'PROART PA401 WOOD TG PWM BLACK',
- 'GT502 TUF GAMING CASE/BLK',
- 'GT502 TUF GAMING CASE/WHT',
- 'GT501 TUF GAMING CASE/GRY/WITH HANDLE',
- 'TUF GAMING GT302 ARGB BLACK',
- 'TUF GAMING GT302 ARGB  WHT',
- 'A31 PLUS/BK/TG/ARGB// ',
- 'AP201 ASUS PRIME CASE MESH',
- 'AP201 ASUS PRIME CASE MESH WHITE EDITION']
-
 # Stock highlighting colors
 green_fill = PatternFill(start_color='00FF00', end_color='00FF00',  fill_type='solid')
 yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00',  fill_type='solid')
 blue_fill = PatternFill(start_color='83CCEB', end_color='83CCEB',  fill_type='solid')
-
-def update_source_file():
-    source_path = os.path.abspath(__file__)
-    with open(source_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    import pprint
-    new_models = "model_names = " + pprint.pformat(model_names, width=120)
-    new_urls = "product_urls = " + pprint.pformat(product_urls, width=120)
-    content = re.sub(r"model_names\s*=\s*\[.*?\]", new_models, content, flags=re.S)
-    content = re.sub(r"product_urls\s*=\s*\[.*?\]", new_urls, content, flags=re.S)
-    with open(source_path, "w", encoding="utf-8") as f:
-        f.write(content)
 
 def normalize_cell_value(value):
     if value is None:
@@ -190,37 +192,37 @@ def product_sums(ws):
     ws["AH20"] = "=SUM(AG19:AG31)"
 
 def run_stock_tracker(target_wb, sheet_name):
-    # # Setup Selenium driver
-    # options = Options()
-    # options.add_argument("--headless")
-    # options.add_argument("--disable-gpu")
-    # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    # Setup Selenium driver
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     # Setup worksheet
     ws = target_wb.create_sheet(title=sheet_name)
     headers = ["Product Category", "Model"] + list(store_map.values())
     ws.append(headers)
 
-    # # Start scanning for URLs
-    # for url in product_urls:
-    #     driver.get(url)
-    #     time.sleep(1)
-    #     product_name = driver.title.split("-")[0].strip()
-    #     row = [None]
-    #     row.append(product_name)
-    #     print(f"\nChecking stock for: {product_name}")
+    # Start scanning for URLs
+    for url in product_urls:
+        driver.get(url)
+        time.sleep(1)
+        product_name = driver.title.split("-")[0].strip()
+        row = [None]
+        row.append(product_name)
+        print(f"\nChecking stock for: {product_name}")
 
-    #     for store_id, store_name in store_map.items():
-    #         try:
-    #             stock = get_stock(url, store_id, driver)
-    #         except:
-    #             stock = 0
-    #         print(f"{store_name}: {stock}")
-    #         row.append(stock)
-    #     ws.append(row)
+        for store_id, store_name in store_map.items():
+            try:
+                stock = get_stock(url, store_id, driver)
+            except:
+                stock = 0
+            print(f"{store_name}: {stock}")
+            row.append(stock)
+        ws.append(row)
 
     format_new_sheet(ws)
-    # driver.quit()
+    driver.quit()
     
 def get_stock(url, store_id, driver):
     driver.get("https://www.microcenter.com")
@@ -303,10 +305,9 @@ def modify_products_window():
                 return
             model_names.append(new_model)
             product_urls.append(new_url)
-            update_source_file()
+            save_products()
             messagebox.showinfo("Product Added", f"{new_model} added.")
-            if add_win.winfo_exists():
-                add_win.destroy()
+            add_win.destroy()
             refresh()
 
         tk.Button(add_win, text="Add", command=confirm_add, width=15).grid(row=2, column=0, pady=20)
@@ -320,7 +321,7 @@ def modify_products_window():
             idx = model_names.index(remove_model)
             model_names.pop(idx)
             product_urls.pop(idx)
-            update_source_file()
+            save_products()
             messagebox.showinfo("Product Removed", f"{remove_model} removed.")
             refresh()
         else:
