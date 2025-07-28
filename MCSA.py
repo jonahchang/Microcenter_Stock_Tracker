@@ -222,6 +222,12 @@ def run_stock_tracker(target_wb, sheet_name):
         ws.append(row)
 
     format_new_sheet(ws)
+
+    for row in range(2, 32):
+        ws[f"AG{row}"] = f"=SUM(C{row}:AE{row})"
+
+    product_sums(ws)
+
     driver.quit()
     
 def get_stock(url, store_id, driver):
@@ -327,6 +333,19 @@ def modify_products_window():
         else:
             messagebox.showinfo("Not Found", f"{remove_model} not found.")
 
+    def reset_to_original():
+        if not os.path.exists("original_products.json"):
+            messagebox.showerror("Error", "original_products.json not found.")
+            return
+        with open("original_products.json", "r") as f:
+            data = json.load(f)
+            model_names[:] = data.get("model_names", [])
+            product_urls[:] = data.get("product_urls", [])
+        save_products()
+        refresh()
+        messagebox.showinfo("Reset Complete", "Product list reset to original.")
+
+
     def done():
         win.quit()
         win.destroy()
@@ -334,6 +353,7 @@ def modify_products_window():
     tk.Button(win, text="Add Product", command=add_product, width=20).grid(row=2, column=0, pady=10)
     tk.Button(win, text="Remove Product", command=remove_product, width=20).grid(row=2, column=1, pady=10)
     tk.Button(win, text="Done", command=done, width=20).grid(row=3, column=0, pady=10)
+    tk.Button(win, text="Reset to Original", command=reset_to_original, width=20).grid(row=3, column=1, pady=10)
 
     refresh()
     win.mainloop()
