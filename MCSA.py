@@ -14,6 +14,8 @@ from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
 
+DEBUG_MODE = True
+
 json_file = "products.json"
 
 def load_products():
@@ -187,6 +189,8 @@ def run_stock_tracker(target_wb, sheet_name):
     # Setup Selenium driver
     options = Options()
     options.add_argument("--headless")
+    if DEBUG_MODE:
+        options.add_argument("--enable-logging")   
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     # Setup worksheet
@@ -200,19 +204,36 @@ def run_stock_tracker(target_wb, sheet_name):
                                ("Chassis", chassis),
                                ("Miscellaneous", miscellaneous)]:
         for name, url in products.items():
+            if not url and DEBUG_MODE:
+                print(f"Skipping {name}: URL is missing")
+                continue
             row = [category, name]
-            driver.get(url)
+            try:
+                driver.get(url)
+            except Exception as e:
+                if DEBUG_MODE:
+                    print(f"Error loading {url}: {e}")
+                continue
             time.sleep(1)
             print(f"\nChecking stock for: {name}")
 
-            for store_id, store_name in store_map.keys():
+            for store_id, store_name in store_map.items():
                 try:
                     stock = get_stock(url, store_id, driver)
-                except:
+                except Exception as e:
+                    if DEBUG_MODE:
+                        print(f"Error fetching stock for {name} at {store_name}: {e}")
                     stock = 0
                 print(f"{store_name}: {stock}")
                 row.append(stock)
             ws.append(row)
+
+            if DEBUG_MODE:
+                try:
+                    target_wb.save("debug_autosave.xlsx")
+                    print(f"Autosaved progress after {name}")
+                except Exception as e:
+                    print(f"Error autosaving workbook: {e}")
 
     category_positions = format_new_sheet(ws)
 
@@ -237,7 +258,10 @@ def get_stock(url, store_id, driver):
         else:
             match = re.search(r"\d+", stock_text)
             return int(match.group(0)) if match else 0
-    except:
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"get_stock failed for {url} at store {store_id}: {e}")
+            sys.stdout.flush()
         return 0
 
 def terminate():
