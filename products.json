@@ -1,12 +1,39 @@
 {
-  "model_names": [
-    "ROG-THOR-1000P2-GAMING",
-    "ROG-STRIX-1200P-GAMING",
-    "ROG-LOKI-1000P-SFX-L-GAMING"
-  ],
-  "product_urls": [
-    "https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply",
-    "https://www.microcenter.com/product/695232/asus-rog-strix-1200-watt-80-plus-platinum-atx-fully-modular-power-supply-atx-31-compatible",
-    "https://www.microcenter.com/product/664884/asus-rog-loki-1000-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-black-atx-30-compatible"
-  ]
+  "power_supplies": {
+    "ROG-THOR-1000P2-GAMING": "https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply",
+    "ROG-STRIX-1200P-GAMING": "https://www.microcenter.com/product/695232/asus-rog-strix-1200-watt-80-plus-platinum-atx-fully-modular-power-supply-atx-31-compatible",
+    "ROG-LOKI-1000P-SFX-L-GAMING": "https://www.microcenter.com/product/664884/asus-rog-loki-1000-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-black-atx-30-compatible",
+    "ROG-LOKI-850P-WHITE-SFX-L-GAMING": "https://www.microcenter.com/product/664885/asus-rog-loki-850-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-white-atx-30-compatible",
+    "ROG-LOKI-850P-SFX-L-GAMING": "https://www.microcenter.com/product/664883/asus-rog-loki-850-watt-80-plus-gold-sfx-l-fully-modular-power-supply-black-atx-30-compatible",
+    "ROG-STRIX-850G-AURA-GAMING": "https://www.microcenter.com/product/669273/asus-rog-strix-gold-aura-edition-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+    "ROG-STRIX-750G-AURA-GAMING": "https://www.microcenter.com/product/669274/asus-rog-strix-gold-aura-edition-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+    "TUF-GAMING-1200G": "https://www.microcenter.com/product/676964/asus-tuf-gaming-1200-watt-80-plus-gold-atx-fully-modular-power-supply",
+    "TUF-GAMING-1000G": "https://www.microcenter.com/product/665308/asus-tuf-gaming-1000-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+    "TUF-GAMING-850G": "https://www.microcenter.com/product/665319/asus-tuf-gaming-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+    "TUF-GAMING-750G": "https://www.microcenter.com/product/665320/asus-tuf-gaming-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+    "AP-850G": "https://www.microcenter.com/product/675843/asus-prime-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+    "AP-750G": "https://www.microcenter.com/product/675842/asus-prime-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible"
+  },
+  "coolers": {
+    "ROG RYUJIN III 360 ARGB EXTREME WHT": "https://www.microcenter.com/product/690065/asus-asus-rog-ryuyjin-iii-360-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-white",
+    "ROG RYUJIN III 360 ARGB EXTREME": "https://www.microcenter.com/product/690066/asus-rog-ryujin-iii-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-black",
+    "ROG RYUJIN III 360": "https://www.microcenter.com/product/668461/asus-rog-ryujin-iii-360mm-all-in-one-liquid-cpu-cooling-kit",
+    "ProArt LC 420": "https://www.microcenter.com/product/678856/asus-proart-lc-420mm-all-in-one-liquid-cpu-cooling-kit-black"
+  },
+  "chassis": {
+    "GR701 ROG HYPERION": "https://www.microcenter.com/product/664435/asus-asus-rog-hyperion-gr701-tempered-glass-eatx-full-tower-computer-case-black",
+    "GX601 ROG STRIX HELIOS CASE/WT/AL/WITH HANDLE": "https://www.microcenter.com/product/625183/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-white-edition",
+    "GX601 ROG STRIX HELIOS CASE/BK/AL/WITH HANDLE": "https://www.microcenter.com/product/609942/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-black",
+    "PA602 ProArt Case": "https://www.microcenter.com/product/676302/asus-proart-pa602-tempered-glass-eatx-mid-tower-computer-case-black",
+    "PROART PA401 WOOD TG PWM BLACK": "https://www.microcenter.com/product/690056/asus-proart-pa401-wood-edition-tempered-glass-atx-mid-tower-computer-case-black",
+    "GT502 TUF GAMING CASE/BLK": "https://www.microcenter.com/product/662252/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-black",
+    "GT502 TUF GAMING CASE/WHT": "https://www.microcenter.com/product/662254/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-white",
+    "GT501 TUF GAMING CASE/GRY/WITH HANDLE": "https://www.microcenter.com/product/601243/asus-tuf-gaming-gt501-rgb-tempered-glass-atx-mid-tower-computer-case",
+    "TUF GAMING GT302 ARGB BLACK": "https://www.microcenter.com/product/679946/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-black",
+    "TUF GAMING GT302 ARGB  WHT": "https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white",
+    "A31 PLUS/BK/TG/ARGB// ": "https://www.microcenter.com/product/690543/asus-a31-plus-tempered-glass-atx-mid-tower-computer-case-black",
+    "AP201 ASUS PRIME CASE MESH": "https://www.microcenter.com/product/651914/asus-prime-ap201-microatx-mini-tower-computer-case-black",
+    "AP201 ASUS PRIME CASE MESH WHITE EDITION": "https://www.microcenter.com/product/651917/asus-prime-ap201-microatx-mini-tower-computer-case-white"
+  },
+  "miscellaneous": {}
 }

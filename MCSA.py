@@ -16,81 +16,75 @@ from openpyxl.styles import PatternFill, Border, Side
 
 json_file = "products.json"
 
-# Load product list
-if os.path.exists(json_file):
-    with open(json_file, "r") as f:
-        data = json.load(f)
-        model_names = data.get("model_names", [])
-        product_urls = data.get("product_urls", [])
-else:
-    # Model names
-    model_names = ['ROG-THOR-1000P2-GAMING',
-                    'ROG-STRIX-1200P-GAMING',
-                    'ROG-LOKI-1000P-SFX-L-GAMING',
-                    'ROG-LOKI-850P-WHITE-SFX-L-GAMING',
-                    'ROG-LOKI-850P-SFX-L-GAMING',
-                    'ROG-STRIX-850G-AURA-GAMING',
-                    'ROG-STRIX-750G-AURA-GAMING',
-                    'TUF-GAMING-1200G',
-                    'TUF-GAMING-1000G',
-                    'TUF-GAMING-850G',
-                    'TUF-GAMING-750G',
-                    'AP-850G',
-                    'AP-750G',
-                    'ROG RYUJIN III 360 ARGB EXTREME WHT',
-                    'ROG RYUJIN III 360 ARGB EXTREME',
-                    'ROG RYUJIN III 360',
-                    'ProArt LC 420',
-                    'GR701 ROG HYPERION',
-                    'GX601 ROG STRIX HELIOS CASE/WT/AL/WITH HANDLE',
-                    'GX601 ROG STRIX HELIOS CASE/BK/AL/WITH HANDLE',
-                    'PA602 ProArt Case',
-                    'PROART PA401 WOOD TG PWM BLACK',
-                    'GT502 TUF GAMING CASE/BLK',
-                    'GT502 TUF GAMING CASE/WHT',
-                    'GT501 TUF GAMING CASE/GRY/WITH HANDLE',
-                    'TUF GAMING GT302 ARGB BLACK',
-                    'TUF GAMING GT302 ARGB  WHT',
-                    'A31 PLUS/BK/TG/ARGB// ',
-                    'AP201 ASUS PRIME CASE MESH',
-                    'AP201 ASUS PRIME CASE MESH WHITE EDITION']
-    
-    # List of product URLs to check
-    product_urls = ['https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply',
-                    'https://www.microcenter.com/product/695232/asus-rog-strix-1200-watt-80-plus-platinum-atx-fully-modular-power-supply-atx-31-compatible',
-                    'https://www.microcenter.com/product/664884/asus-rog-loki-1000-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-black-atx-30-compatible',
-                    'https://www.microcenter.com/product/664885/asus-rog-loki-850-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-white-atx-30-compatible',
-                    'https://www.microcenter.com/product/664883/asus-rog-loki-850-watt-80-plus-gold-sfx-l-fully-modular-power-supply-black-atx-30-compatible',
-                    'https://www.microcenter.com/product/669273/asus-rog-strix-gold-aura-edition-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/669274/asus-rog-strix-gold-aura-edition-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/676964/asus-tuf-gaming-1200-watt-80-plus-gold-atx-fully-modular-power-supply',
-                    'https://www.microcenter.com/product/665308/asus-tuf-gaming-1000-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/665319/asus-tuf-gaming-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/665320/asus-tuf-gaming-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/675843/asus-prime-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/675842/asus-prime-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible',
-                    'https://www.microcenter.com/product/690065/asus-asus-rog-ryuyjin-iii-360-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-white',
-                    'https://www.microcenter.com/product/690066/asus-rog-ryujin-iii-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-black',
-                    'https://www.microcenter.com/product/668461/asus-rog-ryujin-iii-360mm-all-in-one-liquid-cpu-cooling-kit',
-                    'https://www.microcenter.com/product/678856/asus-proart-lc-420mm-all-in-one-liquid-cpu-cooling-kit-black',
-                    'https://www.microcenter.com/product/664435/asus-asus-rog-hyperion-gr701-tempered-glass-eatx-full-tower-computer-case-black',
-                    'https://www.microcenter.com/product/625183/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-white-edition',
-                    'https://www.microcenter.com/product/609942/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-black',
-                    'https://www.microcenter.com/product/676302/asus-proart-pa602-tempered-glass-eatx-mid-tower-computer-case-black',
-                    'https://www.microcenter.com/product/690056/asus-proart-pa401-wood-edition-tempered-glass-atx-mid-tower-computer-case-black',
-                    'https://www.microcenter.com/product/662252/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-black',
-                    'https://www.microcenter.com/product/662254/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-white',
-                    'https://www.microcenter.com/product/601243/asus-tuf-gaming-gt501-rgb-tempered-glass-atx-mid-tower-computer-case',
-                    'https://www.microcenter.com/product/679946/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-black',
-                    'https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white',
-                    'https://www.microcenter.com/product/690543/asus-a31-plus-tempered-glass-atx-mid-tower-computer-case-black',
-                    'https://www.microcenter.com/product/651914/asus-prime-ap201-microatx-mini-tower-computer-case-black',
-                    'https://www.microcenter.com/product/651917/asus-prime-ap201-microatx-mini-tower-computer-case-white']
-    
+def load_products():
+    global power_supplies, coolers, chassis, miscellaneous
+
+    # Load product list
+    if os.path.exists(json_file):
+        with open(json_file, "r") as f:
+            data = json.load(f)
+            power_supplies = data.get("power_supplies", {})
+            coolers = data.get("coolers", {})
+            chassis = data.get("chassis", {})
+            miscellaneous = data.get("miscellaneous", {})
+    else:
+        # Power Supplies
+        power_supplies = {"ROG-THOR-1000P2-GAMING": "https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply",
+                        "ROG-STRIX-1200P-GAMING": "https://www.microcenter.com/product/695232/asus-rog-strix-1200-watt-80-plus-platinum-atx-fully-modular-power-supply-atx-31-compatible",
+                        "ROG-LOKI-1000P-SFX-L-GAMING": "https://www.microcenter.com/product/664884/asus-rog-loki-1000-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-black-atx-30-compatible",
+                        "ROG-LOKI-850P-WHITE-SFX-L-GAMING": "https://www.microcenter.com/product/664885/asus-rog-loki-850-watt-80-plus-platinum-sfx-l-fully-modular-power-supply-white-atx-30-compatible",
+                        "ROG-LOKI-850P-SFX-L-GAMING": "https://www.microcenter.com/product/664883/asus-rog-loki-850-watt-80-plus-gold-sfx-l-fully-modular-power-supply-black-atx-30-compatible",
+                        "ROG-STRIX-850G-AURA-GAMING": "https://www.microcenter.com/product/669273/asus-rog-strix-gold-aura-edition-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+                        "ROG-STRIX-750G-AURA-GAMING": "https://www.microcenter.com/product/669274/asus-rog-strix-gold-aura-edition-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+                        "TUF-GAMING-1200G": "https://www.microcenter.com/product/676964/asus-tuf-gaming-1200-watt-80-plus-gold-atx-fully-modular-power-supply",
+                        "TUF-GAMING-1000G": "https://www.microcenter.com/product/665308/asus-tuf-gaming-1000-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+                        "TUF-GAMING-850G": "https://www.microcenter.com/product/665319/asus-tuf-gaming-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+                        "TUF-GAMING-750G": "https://www.microcenter.com/product/665320/asus-tuf-gaming-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+                        "AP-850G": "https://www.microcenter.com/product/675843/asus-prime-850-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible",
+                        "AP-750G": "https://www.microcenter.com/product/675842/asus-prime-750-watt-80-plus-gold-atx-fully-modular-power-supply-atx-30-compatible"}
+        
+        # Coolers
+        coolers = {"ROG RYUJIN III 360 ARGB EXTREME WHT": "https://www.microcenter.com/product/690065/asus-asus-rog-ryuyjin-iii-360-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-white",
+                    "ROG RYUJIN III 360 ARGB EXTREME": "https://www.microcenter.com/product/690066/asus-rog-ryujin-iii-argb-extreme-360mm-all-in-one-liquid-cpu-cooling-kit-black",
+                    "ROG RYUJIN III 360": "https://www.microcenter.com/product/668461/asus-rog-ryujin-iii-360mm-all-in-one-liquid-cpu-cooling-kit",
+                    "ProArt LC 420": "https://www.microcenter.com/product/678856/asus-proart-lc-420mm-all-in-one-liquid-cpu-cooling-kit-black"}
+
+        # Chassis
+        chassis = {"GR701 ROG HYPERION": "https://www.microcenter.com/product/664435/asus-asus-rog-hyperion-gr701-tempered-glass-eatx-full-tower-computer-case-black",
+                    "GX601 ROG STRIX HELIOS CASE/WT/AL/WITH HANDLE": "https://www.microcenter.com/product/625183/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-white-edition",
+                    "GX601 ROG STRIX HELIOS CASE/BK/AL/WITH HANDLE": "https://www.microcenter.com/product/609942/asus-rog-strix-helios-gx601-rgb-tempered-glass-atx-mid-tower-computer-case-black",
+                    "PA602 ProArt Case": "https://www.microcenter.com/product/676302/asus-proart-pa602-tempered-glass-eatx-mid-tower-computer-case-black",
+                    "PROART PA401 WOOD TG PWM BLACK": "https://www.microcenter.com/product/690056/asus-proart-pa401-wood-edition-tempered-glass-atx-mid-tower-computer-case-black",
+                    "GT502 TUF GAMING CASE/BLK": "https://www.microcenter.com/product/662252/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-black",
+                    "GT502 TUF GAMING CASE/WHT": "https://www.microcenter.com/product/662254/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-white",
+                    "GT501 TUF GAMING CASE/GRY/WITH HANDLE": "https://www.microcenter.com/product/601243/asus-tuf-gaming-gt501-rgb-tempered-glass-atx-mid-tower-computer-case",
+                    "TUF GAMING GT302 ARGB BLACK": "https://www.microcenter.com/product/679946/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-black",
+                    "TUF GAMING GT302 ARGB  WHT": "https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white",
+                    "A31 PLUS/BK/TG/ARGB// ": "https://www.microcenter.com/product/690543/asus-a31-plus-tempered-glass-atx-mid-tower-computer-case-black",
+                    "AP201 ASUS PRIME CASE MESH": "https://www.microcenter.com/product/651914/asus-prime-ap201-microatx-mini-tower-computer-case-black",
+                    "AP201 ASUS PRIME CASE MESH WHITE EDITION": "https://www.microcenter.com/product/651917/asus-prime-ap201-microatx-mini-tower-computer-case-white"}
+        
+        # Miscellaneous
+        miscellaneous = {}
+
+        with open("original_products.json", "w") as f:
+            json.dump({
+                "power_supplies": power_supplies,
+                "coolers": coolers,
+                "chassis": chassis,
+                "miscellaneous": miscellaneous
+            }, f, indent=2)
+
+        save_products()
+
 def save_products():
     with open(json_file, "w") as f:
-        json.dump({"model_names": model_names, "product_urls": product_urls}, f, indent=2)
-
+        json.dump({
+            "power_supplies": power_supplies,
+            "coolers": coolers,
+            "chassis": chassis,
+            "miscellaneous": miscellaneous
+        }, f, indent=2)
 
 # Mapping of store ID to store name (must match Excel header format)
 store_map = {
@@ -123,7 +117,6 @@ def normalize_cell_value(value):
     except ValueError:
         return 0
     
-
 def analyze_stock(filename):
     wb = openpyxl.load_workbook(filename)
     sheetnames = wb.sheetnames
@@ -148,25 +141,26 @@ def analyze_stock(filename):
 
 # Format the sheet
 def format_new_sheet(ws):
-    for i, name in enumerate(model_names, start=2):
-        ws[f"B{i}"] = name
-
-    ws.merge_cells("A2:A14")
-    ws["A2"] = "Power Supply"
-    ws.merge_cells("A15:A18")
-    ws["A15"] = "AIO Liquid CPU Cooler"
-    ws.merge_cells("A19:A31")
-    ws["A19"] = "Chassis"
-
-    ws["AG1"] = "INDIVIDUAL TOTALS"
-    ws["AH1"] = "CATEGORY TOTALS"
-    ws["AH2"] = "PSU"
-    ws["AH15"] = "AIO"
-    ws["AH19"] = "CHASSIS"
+    category_positions = {}
+    row_start = 2
+    for category, products in [("Power Supply", power_supplies),
+                               ("Cooler", coolers),
+                               ("Chassis", chassis),
+                               ("Miscellaneous", miscellaneous)]:
+        if not products:
+            continue
+        row_end = row_start + len(products) - 1
+        ws.merge_cells(start_row=row_start, start_column=1, end_row = row_end, end_column=1)
+        ws[f"A{row_start}"] = category
+        ws[f"AH{row_start}"] = category.upper()
+        category_positions[category] = row_start
+        for i, name in enumerate(products.keys(), start=row_start):
+            ws[f"B{i}"] = name
+        row_start = row_end + 1
 
     thin = Side(border_style="thin", color="000000")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    for row in ws["A1:AE31"]:
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=31):
         for cell in row:
             cell.border = border
 
@@ -174,59 +168,55 @@ def format_new_sheet(ws):
         max_length = 0
         col_letter = col[0].column_letter
         for cell in col:
-            try:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-            adjusted_width = (max_length + 2)
-            ws.column_dimensions[col_letter].width = adjusted_width
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = max_length + 2
 
+    return category_positions
 
-def product_sums(ws):
-    for row in range(2, 32):
+def product_sums(ws, category_positions):
+    for row in range(2, ws.max_row + 1):
         ws[f"AG{row}"] = f"=SUM(C{row}:AE{row})"
 
-    ws["AH3"] = "=SUM(AG2:AG14)"
-    ws["AH16"] = "=SUM(AG15:AG18)"
-    ws["AH20"] = "=SUM(AG19:AG31)"
+    for category, start_row in category_positions.items():
+        total_rows = [f"AG{row}" for row in range(start_row, ws.max_row + 1) if ws[f"A{row}"].value == category]
+        if total_rows:
+            ws[f"AH{start_row + 1}"] = f"=SUM({','.join(total_rows)})"
 
 def run_stock_tracker(target_wb, sheet_name):
     # Setup Selenium driver
     options = Options()
     options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     # Setup worksheet
     ws = target_wb.create_sheet(title=sheet_name)
-    headers = ["Product Category", "Model"] + list(store_map.values())
+    headers = ["Product Category", "Model"] + list(store_map.values()) + ["INDIVIDUAL TOTALS", "CATEGORY TOTALS"]
     ws.append(headers)
 
     # Start scanning for URLs
-    for url in product_urls:
-        driver.get(url)
-        time.sleep(1)
-        product_name = driver.title.split("-")[0].strip()
-        row = [None]
-        row.append(product_name)
-        print(f"\nChecking stock for: {product_name}")
+    for category, products in [("Power Supply", power_supplies),
+                               ("Cooler", coolers),
+                               ("Chassis", chassis),
+                               ("Miscellaneous", miscellaneous)]:
+        for name, url in products.items():
+            row = [category, name]
+            driver.get(url)
+            time.sleep(1)
+            print(f"\nChecking stock for: {name}")
 
-        for store_id, store_name in store_map.items():
-            try:
-                stock = get_stock(url, store_id, driver)
-            except:
-                stock = 0
-            print(f"{store_name}: {stock}")
-            row.append(stock)
-        ws.append(row)
+            for store_id, store_name in store_map.keys():
+                try:
+                    stock = get_stock(url, store_id, driver)
+                except:
+                    stock = 0
+                print(f"{store_name}: {stock}")
+                row.append(stock)
+            ws.append(row)
 
-    format_new_sheet(ws)
+    category_positions = format_new_sheet(ws)
 
-    for row in range(2, 32):
-        ws[f"AG{row}"] = f"=SUM(C{row}:AE{row})"
-
-    product_sums(ws)
+    product_sums(ws, category_positions)
 
     driver.quit()
     
@@ -257,35 +247,44 @@ def terminate():
 def modify_products_window():
     win = tk.Toplevel()
     win.title("Modify Products")
-    win.geometry("1000x600")
+    win.geometry("1200x600")
     win.protocol("WM_DELETE_WINDOW", terminate)
 
     def refresh():
         if not win.winfo_exists():
             return
+        
+        all_items, idx = [], 1
+        for category, products in [("Power Supplies", power_supplies),
+                                   ("Coolers", coolers), 
+                                   ("Chassis", chassis), 
+                                   ("Miscellaneous", miscellaneous)]:
+            for name, url in products.items():
+                all_items.append((idx, category, name, url))
+                idx += 1
 
         names_text.config(state="normal")
         names_text.delete("1.0", "end")
-        names_text.insert("1.0", "\n".join(model_names))
+        names_text.insert("1.0", "\n".join(f"{i}. [{cat}] {name}" for i, cat, name, _ in all_items))
         names_text.config(state="disabled")
 
         urls_text.config(state="normal")
         urls_text.delete("1.0", "end")
-        urls_text.insert("1.0", "\n".join(product_urls))
+        urls_text.insert("1.0", "\n".join(f"{i}. {url}" for i, _, _, url in all_items))
         urls_text.config(state="disabled")
+
+        return all_items
 
     # Display model names
     tk.Label(win, text="Product Names", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=10, pady=5, sticky="w")
     names_text = tk.Text(win, width=40, height=25, wrap="word")
     names_text.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
-    names_text.insert("1.0", "\n".join(model_names))
     names_text.config(state="disabled")
 
     # Display URLs
     tk.Label(win, text="Product URLs", font=("Arial", 12, "bold")).grid(row=0, column=1, padx=10, pady=5, sticky="w")
-    urls_text = tk.Text(win, width=80, height=25, wrap="word")
+    urls_text = tk.Text(win, width=120, height=25, wrap="word")
     urls_text.grid(row=1, column=1, padx=10, pady=5, sticky="nsew")
-    urls_text.insert("1.0", "\n".join(product_urls))
     urls_text.config(state="disabled")
 
     # Add and Remove buttons
@@ -303,16 +302,26 @@ def modify_products_window():
         url_entry = tk.Entry(add_win, width=50)
         url_entry.grid(row=1, column=1, padx=10, pady=10)
 
+        tk.Label(add_win, text="Category:").grid(row=2, column=0, padx=10, pady=10, sticky="e")
+        category_var = tk.StringVar(value="Power Supply")
+        tk.OptionMenu(add_win, category_var, "Power Supply", "Cooler", "Chassis", "None").grid(row=2, column=1, padx=10, pady=10, sticky="w")
+
         def confirm_add():
-            new_model = model_entry.get().strip()
-            new_url = url_entry.get().strip()
+            new_model, new_url, category = model_entry.get().strip(), url_entry.get().strip(), category_var.get()
+
             if not new_model or not new_url:
                 messagebox.showerror("Error", "Both Model Name and Product URL are required.")
                 return
-            model_names.append(new_model)
-            product_urls.append(new_url)
+            if category == "Power Supply":
+                power_supplies[new_model] = new_url
+            elif category == "Cooler":
+                coolers[new_model] = new_url
+            elif category == "Chassis":
+                chassis[new_model] = new_url
+            else:
+                miscellaneous[new_model] = new_url
             save_products()
-            messagebox.showinfo("Product Added", f"{new_model} added.")
+            messagebox.showinfo("Product Added", f"{new_model} added to {category}.")
             add_win.destroy()
             refresh()
 
@@ -320,18 +329,33 @@ def modify_products_window():
         tk.Button(add_win, text="Cancel", command=add_win.destroy, width=15).grid(row=2, column=1, pady=20)
 
     def remove_product():
-        remove_model = simpledialog.askstring("Remove Product", "Enter the exact model name to remove:")
+        all_items = refresh()
+
+        remove_model = simpledialog.askstring("Remove Product", "Enter the exact model name or model number to remove:")
         if not remove_model:
             return
-        if remove_model in model_names:
-            idx = model_names.index(remove_model)
-            model_names.pop(idx)
-            product_urls.pop(idx)
-            save_products()
-            messagebox.showinfo("Product Removed", f"{remove_model} removed.")
-            refresh()
+        
+        if remove_model.isdigit():
+            remove_idx = int(remove_model)
+            for idx, category, name, url in all_items:
+                if idx == remove_idx:
+                    target_map = {"Power Supplies": power_supplies, "Coolers": coolers, "Chassis": chassis, "Miscellaneous": miscellaneous}[category]
+                    if name in target_map:
+                        del target_map[name]
+                        save_products()
+                        messagebox.showinfo("Product Removed", f"{name} removed.")
+                        refresh()
+                        return
         else:
-            messagebox.showinfo("Not Found", f"{remove_model} not found.")
+            for product_map in [power_supplies, coolers, chassis, miscellaneous]:
+                if remove_model in product_map:
+                    del product_map[remove_model]
+                    save_products()
+                    messagebox.showinfo("Product Removed", f"{remove_model} removed.")
+                    refresh()
+                    return
+
+        messagebox.showinfo("Not Found", f"{remove_model} not found.")
 
     def reset_to_original():
         if not os.path.exists("original_products.json"):
@@ -339,8 +363,10 @@ def modify_products_window():
             return
         with open("original_products.json", "r") as f:
             data = json.load(f)
-            model_names[:] = data.get("model_names", [])
-            product_urls[:] = data.get("product_urls", [])
+            power_supplies.clear(); power_supplies.update(data.get("power_supplies", {}))
+            coolers.clear(); coolers.update(data.get("coolers", {}))
+            chassis.clear(); chassis.update(data.get("chassis", {}))
+            miscellaneous.clear(); miscellaneous.update(data.get("miscellaneous", {}))
         save_products()
         refresh()
         messagebox.showinfo("Reset Complete", "Product list reset to original.")
@@ -359,6 +385,8 @@ def modify_products_window():
     win.mainloop()
 
 def main():
+    load_products()
+
     # Prompt user for file save location
     root = Tk()
     root.withdraw()  # Hide the main window
