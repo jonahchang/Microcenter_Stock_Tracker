@@ -98,6 +98,65 @@ green_fill = PatternFill(start_color='00FF00', end_color='00FF00',  fill_type='s
 yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00',  fill_type='solid')
 blue_fill = PatternFill(start_color='83CCEB', end_color='83CCEB',  fill_type='solid')
 
+def process_add_products_sheet(wb):
+    if "Add Products" not in wb.sheetnames:
+        return
+    
+    sheet = wb["Add Products"]
+    row = 3
+    added_any = False
+
+    while True:
+        name_cell = sheet[f"A{row}"]
+        url_cell = sheet[f"B{row}"]
+        cat_cell = sheet[f"C{row}"]
+
+        name = name_cell.value.strip() if name_cell.value else ""
+        url = url_cell.value.strip() if url_cell.value else ""
+        category = (cat_cell.value or "").strip().lower()
+
+        if not name and not url and not category:
+            break
+
+        if not name or not url:
+            row += 1
+            continue
+
+        if not category:
+            category = "miscellaneous"
+
+        category_map = {
+            "power supply": power_supplies,
+            "cooler": coolers,
+            "chassis": chassis,
+            "miscellaneous": miscellaneous
+        }
+
+        target_dict = category_map.get(category.lower(), miscellaneous)
+        if name not in target_dict:
+            target_dict[name] = url
+            added_any = True
+
+        for col in ["A", "B", "C"]:
+            sheet[f"{col}{row}"].value = None
+
+        row += 1
+
+    rows = list(sheet.iter_rows(min_row=3, max_row=sheet.max_row, min_col=1, max_col=3))
+    clean_data = [[cell.value for cell in row] for row in rows if any(cell.value for cell in row)]
+
+    for i in range(3, sheet.max_row + 1):
+        for col in ["A", "B", "C"]:
+            sheet[f"{col}{i}"].value = None
+
+    for idx, (name, url, category) in enumerate(clean_data, start=3):
+        sheet[f"A{idx}"] = name
+        sheet[f"B{idx}"] = url
+        sheet[f"C{idx}"] = category
+
+    if added_any:
+        save_products(json_file)
+
 def normalize_cell_value(value):
     if value is None:
         return 0
@@ -462,6 +521,7 @@ def main():
         # Run the stock tracker and coloring
         wb = load_workbook(file_path)
         sheet_name = f"WK{week_number}"
+        process_add_products_sheet(wb)
         run_stock_tracker(wb, sheet_name)
         wb.save(file_path)
         analyze_stock(file_path)
