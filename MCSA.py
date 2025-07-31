@@ -17,6 +17,7 @@ from openpyxl.styles import PatternFill, Border, Side
 DEBUG_MODE = True
 
 json_file = "products.json"
+original_file = "original_products.json"
 
 def load_products():
     global power_supplies, coolers, chassis, miscellaneous
@@ -69,18 +70,12 @@ def load_products():
         # Miscellaneous
         miscellaneous = {}
 
-        with open("original_products.json", "w") as f:
-            json.dump({
-                "power_supplies": power_supplies,
-                "coolers": coolers,
-                "chassis": chassis,
-                "miscellaneous": miscellaneous
-            }, f, indent=2)
+        save_products(original_file)
 
-        save_products()
+        save_products(json_file)
 
-def save_products():
-    with open(json_file, "w") as f:
+def save_products(filename):
+    with open(filename, "w") as f:
         json.dump({
             "power_supplies": power_supplies,
             "coolers": coolers,
@@ -268,21 +263,39 @@ def terminate():
     sys.exit()
 
 # Prompt user to add or remove products
-def modify_products_window():
+def modify_products_window(use_original=False):
+    filename = original_file if use_original else json_file
+
     win = tk.Toplevel()
-    win.title("Modify Products")
-    win.geometry("1200x600")
+    win.title("Modify Original Products" if use_original else "Modify Products")
+    win.geometry("1200x700")
     win.protocol("WM_DELETE_WINDOW", terminate)
+
+    with open(filename, "r") as f:
+        data = json.load(f)
+        local_power = data.get("power_supplies", {})
+        local_coolers = data.get("coolers", {})
+        local_chassis = data.get("chassis", {})
+        local_misc = data.get("miscellaneous", {})
+
+    def save_changes():
+        with open(filename, "w") as f:
+            json.dump({
+                "power_supplies": local_power,
+                "coolers": local_coolers,
+                "chassis": local_chassis,
+                "miscellaneous": local_misc
+            }, f, indent=2)
 
     def refresh():
         if not win.winfo_exists():
             return
         
         all_items, idx = [], 1
-        for category, products in [("Power Supplies", power_supplies),
-                                   ("Coolers", coolers), 
-                                   ("Chassis", chassis), 
-                                   ("Miscellaneous", miscellaneous)]:
+        for category, products in [("Power Supplies", local_power),
+                                   ("Coolers", local_coolers), 
+                                   ("Chassis", local_chassis), 
+                                   ("Miscellaneous", local_misc)]:
             for name, url in products.items():
                 all_items.append((idx, category, name, url))
                 idx += 1
@@ -300,13 +313,13 @@ def modify_products_window():
         return all_items
 
     # Display model names
-    tk.Label(win, text="Product Names", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    tk.Label(win, text="Original Product Names" if use_original else "Product Names", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=10, pady=5, sticky="w")
     names_text = tk.Text(win, width=40, height=25, wrap="word")
     names_text.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
     names_text.config(state="disabled")
 
     # Display URLs
-    tk.Label(win, text="Product URLs", font=("Arial", 12, "bold")).grid(row=0, column=1, padx=10, pady=5, sticky="w")
+    tk.Label(win, text="Original Product URLs" if use_original else "Product URLs", font=("Arial", 12, "bold")).grid(row=0, column=1, padx=10, pady=5, sticky="w")
     urls_text = tk.Text(win, width=120, height=25, wrap="word")
     urls_text.grid(row=1, column=1, padx=10, pady=5, sticky="nsew")
     urls_text.config(state="disabled")
@@ -337,14 +350,14 @@ def modify_products_window():
                 messagebox.showerror("Error", "Both Model Name and Product URL are required.")
                 return
             if category == "Power Supply":
-                power_supplies[new_model] = new_url
+                local_power[new_model] = new_url
             elif category == "Cooler":
-                coolers[new_model] = new_url
+                local_coolers[new_model] = new_url
             elif category == "Chassis":
-                chassis[new_model] = new_url
+                local_chassis[new_model] = new_url
             else:
-                miscellaneous[new_model] = new_url
-            save_products()
+                local_misc[new_model] = new_url
+            save_changes()
             messagebox.showinfo("Product Added", f"{new_model} added to {category}.")
             add_win.destroy()
             refresh()
@@ -361,20 +374,24 @@ def modify_products_window():
         
         if remove_model.isdigit():
             remove_idx = int(remove_model)
-            for idx, category, name, url in all_items:
+            for idx, category, name, _ in all_items:
                 if idx == remove_idx:
-                    target_map = {"Power Supplies": power_supplies, "Coolers": coolers, "Chassis": chassis, "Miscellaneous": miscellaneous}[category]
-                    if name in target_map:
-                        del target_map[name]
-                        save_products()
-                        messagebox.showinfo("Product Removed", f"{name} removed.")
-                        refresh()
-                        return
+                    target_map = {
+                        "Power Supplies": local_power,
+                        "Coolers": local_coolers,
+                        "Chassis": local_chassis,
+                        "Miscellaneous": local_misc
+                    }[category]
+                    del target_map[name]
+                    save_changes()
+                    messagebox.showinfo("Product Removed", f"{name} removed.")
+                    refresh()
+                    return
         else:
-            for product_map in [power_supplies, coolers, chassis, miscellaneous]:
+            for product_map in [local_power, local_coolers, local_chassis, local_misc]:
                 if remove_model in product_map:
                     del product_map[remove_model]
-                    save_products()
+                    save_changes()
                     messagebox.showinfo("Product Removed", f"{remove_model} removed.")
                     refresh()
                     return
@@ -385,13 +402,19 @@ def modify_products_window():
         if not os.path.exists("original_products.json"):
             messagebox.showerror("Error", "original_products.json not found.")
             return
-        with open("original_products.json", "r") as f:
+        with open(original_file, "r") as f:
             data = json.load(f)
             power_supplies.clear(); power_supplies.update(data.get("power_supplies", {}))
             coolers.clear(); coolers.update(data.get("coolers", {}))
             chassis.clear(); chassis.update(data.get("chassis", {}))
             miscellaneous.clear(); miscellaneous.update(data.get("miscellaneous", {}))
-        save_products()
+            # Also update the local GUI references
+            local_power.clear(); local_power.update(power_supplies)
+            local_coolers.clear(); local_coolers.update(coolers)
+            local_chassis.clear(); local_chassis.update(chassis)
+            local_misc.clear(); local_misc.update(miscellaneous)
+
+        save_products(json_file)
         refresh()
         messagebox.showinfo("Reset Complete", "Product list reset to original.")
 
@@ -404,6 +427,8 @@ def modify_products_window():
     tk.Button(win, text="Remove Product", command=remove_product, width=20).grid(row=2, column=1, pady=10)
     tk.Button(win, text="Done", command=done, width=20).grid(row=3, column=0, pady=10)
     tk.Button(win, text="Reset to Original", command=reset_to_original, width=20).grid(row=3, column=1, pady=10)
+    if not use_original:
+        tk.Button(win, text="Modify Original", command=lambda: modify_products_window(use_original=True), width=20).grid(row=4, column=1, pady=10)
 
     refresh()
     win.mainloop()
