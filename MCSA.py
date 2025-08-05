@@ -9,6 +9,9 @@ from tkinter import Tk, filedialog, simpledialog, messagebox
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
@@ -174,18 +177,36 @@ def normalize_cell_value(value):
         return 0
     
 def analyze_stock(filename):
-    wb = openpyxl.load_workbook(filename)
+    wb = load_workbook(filename)
     sheetnames = wb.sheetnames
     
     for i in range(2, len(sheetnames)):
         prev_sheet = wb[sheetnames[i - 1]]
         curr_sheet = wb[sheetnames[i]]
-        for row in curr_sheet.iter_rows():
-            for cell in row:
-                prev_val = normalize_cell_value(prev_sheet.cell(row=cell.row, column=cell.column).value)
-                curr_val = normalize_cell_value(cell.value)
 
-                if (prev_val == 'N/A' and isinstance(curr_val, int)) or (curr_val == 'N/A' and isinstance(prev_val, int)):
+        def sheet_to_dict(sheet):
+            data = {}
+            for row in sheet.iter_rows(min_row=2):
+                name = str(row[1].value).strip() if row[1].value else None
+                if not name:
+                    continue
+                values = [normalize_cell_value(cell.value) for cell in row[2:]]
+                data[name] = values
+            return data
+        
+        prev_data = sheet_to_dict(prev_sheet)
+
+        for row in curr_sheet.iter_rows(min_row=2):
+            product_name = str(row[1].value).strip() if row[1].value else None
+            if not product_name or product_name not in prev_data:
+                continue
+
+            prev_row = prev_data[product_name]
+            curr_row = [normalize_cell_value(cell.value) for cell in row]
+
+            for j, (prev_val, curr_val) in enumerate(zip(prev_row, curr_row), start=2):
+                cell = row[j]
+                if(prev_val == 'N/A' and isinstance(curr_val, int)) or (curr_val == 'N/A' and isinstance(prev_val, int)):
                     cell.fill = blue_fill
                 elif isinstance(prev_val, int) and isinstance(curr_val, int):
                     if curr_val > prev_val:
@@ -231,8 +252,9 @@ def format_new_sheet(ws):
     return category_positions
 
 def product_sums(ws, category_positions):
-    for row in range(2, ws.max_row + 1):
+    for row in range(2, 30):
         ws[f"AG{row}"] = f"=SUM(C{row}:AE{row})"
+        ws[f"AI{row}"] = f"=COUNTIF(C{row}:AE{row}, 0)"
 
     for category, start_row in category_positions.items():
         total_rows = [f"AG{row}" for row in range(start_row, ws.max_row + 1) if ws[f"A{row}"].value == category]
@@ -246,10 +268,11 @@ def run_stock_tracker(target_wb, sheet_name):
     if DEBUG_MODE:
         options.add_argument("--enable-logging")   
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.set_page_load_timeout(6)
 
     # Setup worksheet
     ws = target_wb.create_sheet(title=sheet_name)
-    headers = ["Product Category", "Model"] + list(store_map.values()) + ["INDIVIDUAL TOTALS", "CATEGORY TOTALS"]
+    headers = ["Product Category", "Model"] + list(store_map.values()) + ["INDIVIDUAL TOTALS", "CATEGORY TOTALS", "OUT OF STOCK"]
     ws.append(headers)
 
     # Start scanning for URLs
@@ -264,11 +287,19 @@ def run_stock_tracker(target_wb, sheet_name):
             row = [category, name]
             try:
                 driver.get(url)
+            except TimeoutException:
+                if DEBUG_MODE:
+                    print(f"Timeout loading {url}, skipping")
+                row += [0] * len(store_map)
+                ws.append(row)
+                continue
             except Exception as e:
                 if DEBUG_MODE:
-                    print(f"Error loading {url}: {e}")
+                    print(f"Error loading {url}: {str(e).splitlines()[0]}")
+                row += [0] * len(store_map)
+                ws.append(row)
                 continue
-            time.sleep(1)
+
             print(f"\nChecking stock for: {name}")
 
             for store_id, store_name in store_map.items():
@@ -276,7 +307,7 @@ def run_stock_tracker(target_wb, sheet_name):
                     stock = get_stock(url, store_id, driver)
                 except Exception as e:
                     if DEBUG_MODE:
-                        print(f"Error fetching stock for {name} at {store_name}: {e}")
+                        print(f"Error fetching stock for {name} at {store_name}: {str(e).splitlines()[0]}")
                     stock = 0
                 print(f"{store_name}: {stock}")
                 row.append(stock)
@@ -296,26 +327,28 @@ def run_stock_tracker(target_wb, sheet_name):
     driver.quit()
     
 def get_stock(url, store_id, driver):
-    driver.get("https://www.microcenter.com")
-    time.sleep(0.5)
-    driver.add_cookie({
-        'name': 'storeSelected', 'value': store_id, 'domain': '.microcenter.com', 'path': '/',
-        'secure': True, 'httpOnly': False
-    })
-    driver.get(url)
-    time.sleep(1)
     try:
-        stock_element = driver.find_element(By.CSS_SELECTOR, "#pnlInventory > div > div > span > span.inventoryCnt")
+        driver.get("https://www.microcenter.com")
+        driver.add_cookie({
+            'name': 'storeSelected', 'value': store_id, 'domain': '.microcenter.com', 'path': '/'})
+        driver.get(url)
+
+        stock_element = WebDriverWait(driver, 6).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#pnlInventory span.inventoryCnt"))
+        )
+
         stock_text = stock_element.text.strip()
+
         if "25+" in stock_text:
             return "25+"
         else:
             match = re.search(r"\d+", stock_text)
             return int(match.group(0)) if match else 0
+    except (TimeoutException, NoSuchElementException):
+        return 0
     except Exception as e:
         if DEBUG_MODE:
-            print(f"get_stock failed for {url} at store {store_id}: {e}")
-            sys.stdout.flush()
+            print(f"get_stock failed for {url} at store {store_id}: {str(e).splitlines()[0]}")
         return 0
 
 def terminate():
@@ -494,6 +527,7 @@ def modify_products_window(use_original=False):
 
 def main():
     load_products()
+    final_message = "Error"
 
     # Prompt user for file save location
     root = Tk()
@@ -510,6 +544,8 @@ def main():
 
     use_existing = messagebox.askyesno("Stock Tracker", "Would you like to edit an existing Excel file?")
 
+    file_path = None
+    save_path = None
     # If the user owns the stock tracker file
     if use_existing:
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
@@ -517,15 +553,29 @@ def main():
             messagebox.showinfo("Cancelled", "No file selected. Exiting.")
             time.sleep(2)
             terminate()
+    else:
+        save_path = filedialog.asksaveasfilename(defaultextension=".xlsx",
+                                                 filetypes=[("Excel files", "*.xlsx")],
+                                                 title="Save new stock report as")
+        if not save_path:
+            messagebox.showinfo("Cancelled", "No save location selected.")
+            time.sleep(2)
+            terminate()
+
+    root.destroy()
         
+    if use_existing:
         # Run the stock tracker and coloring
         wb = load_workbook(file_path)
         sheet_name = f"WK{week_number}"
         process_add_products_sheet(wb)
         run_stock_tracker(wb, sheet_name)
+        print("Check 1")
         wb.save(file_path)
+        print("Check 2")
         analyze_stock(file_path)
-        messagebox.showinfo("Done", f"Stock data added and highlighted in:\n{file_path}")
+        print("Check 3")
+        final_message = f"Stock data added and highlighted in:\n{file_path}"
     else:
         # If the user opts to create an independent sheet with this week's stock
         wb = Workbook()
@@ -533,16 +583,17 @@ def main():
         sheet_name = f"WK{week_number}"
         ws.title = sheet_name
         run_stock_tracker(wb, sheet_name)
-        save_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")], title="Save new stock report as")
-        if save_path:
-            wb.save(save_path)
-            messagebox.showinfo("Saved", f"New stock report saved as:\n{save_path}")
-            time.sleep(2)
-            terminate()
-        else:
-            messagebox.showinfo("Cancelled", "No save location selected.")
-            time.sleep(2)
-            terminate()
+        wb.save(save_path)
+        analyze_stock(save_path)
+        final_message = f"New stock report saved as:\n{save_path}"
+
+    root = Tk()
+    root.withdraw()
+    messagebox.showinfo("Done", final_message)
+    print("Check 4")
+
+    time.sleep(2)
+    terminate()
 
 if __name__ == "__main__":
     main()
