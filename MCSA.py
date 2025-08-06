@@ -16,6 +16,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
+from concurrent.futures import ThreadPoolExecutor
 
 DEBUG_MODE = True
 
@@ -190,7 +191,7 @@ def analyze_stock(filename):
                 name = str(row[1].value).strip() if row[1].value else None
                 if not name:
                     continue
-                values = [normalize_cell_value(cell.value) for cell in row[2:]]
+                values = [normalize_cell_value(cell.value) for cell in row[2:31]]
                 data[name] = values
             return data
         
@@ -202,7 +203,7 @@ def analyze_stock(filename):
                 continue
 
             prev_row = prev_data[product_name]
-            curr_row = [normalize_cell_value(cell.value) for cell in row]
+            curr_row = [normalize_cell_value(cell.value) for cell in row[2:31]]
 
             for j, (prev_val, curr_val) in enumerate(zip(prev_row, curr_row), start=2):
                 cell = row[j]
@@ -252,16 +253,53 @@ def format_new_sheet(ws):
     return category_positions
 
 def product_sums(ws, category_positions):
-    for row in range(2, 30):
-        ws[f"AG{row}"] = f"=SUM(C{row}:AE{row})"
-        ws[f"AI{row}"] = f"=COUNTIF(C{row}:AE{row}, 0)"
+    def get_merged_value(ws, cell_ref):
+        cell = ws[cell_ref]
+        for merged_range in ws.merged_cells.ranges:
+            if cell.coordinate in merged_range:
+                return ws[merged_range.coord.split(":")[0]].value
+        return cell.value
 
-    for category, start_row in category_positions.items():
-        total_rows = [f"AG{row}" for row in range(start_row, ws.max_row + 1) if ws[f"A{row}"].value == category]
+
+
+    for row in range(2, ws.max_row + 1):
+        ws[f"AF{row}"] = f"=SUM(C{row}:AE{row})"
+        ws[f"AH{row}"] = f"=COUNTIF(C{row}:AE{row}, 0)"
+
+    category_blocks = {}
+    current_category = None
+    current_start = None
+
+    for row in range(2, ws.max_row + 1):
+        category_value = get_merged_value(ws, f"A{row}")
+
+        if category_value != current_category:
+            # Close the previous category block
+            if current_category is not None:
+                category_blocks[current_category] = (current_start, row)
+            # Start a new category block
+            current_category = category_value
+            current_start = row
+
+    # Close the last category block
+    if current_category is not None:
+        category_blocks[current_category] = (current_start, ws.max_row + 1)
+
+    # 3. Write category totals in AG at the top row of each category
+    for category, (start_row, end_row) in category_blocks.items():
+        total_rows = []
+        for row in range(start_row, end_row):
+            if not get_merged_value(ws, f"A{row}"):  # Stop if blank
+                break
+            total_rows.append(f"AF{row}")
+
         if total_rows:
-            ws[f"AH{start_row + 1}"] = f"=SUM({','.join(total_rows)})"
+            ws[f"AG{start_row}"] = f"=SUM({','.join(total_rows)})"
 
 def run_stock_tracker(target_wb, sheet_name):
+    global STOCK_TRACKER_START
+    STOCK_TRACKER_START = time.time()
+
     # Setup Selenium driver
     options = Options()
     options.add_argument("--headless")
@@ -285,20 +323,6 @@ def run_stock_tracker(target_wb, sheet_name):
                 print(f"Skipping {name}: URL is missing")
                 continue
             row = [category, name]
-            try:
-                driver.get(url)
-            except TimeoutException:
-                if DEBUG_MODE:
-                    print(f"Timeout loading {url}, skipping")
-                row += [0] * len(store_map)
-                ws.append(row)
-                continue
-            except Exception as e:
-                if DEBUG_MODE:
-                    print(f"Error loading {url}: {str(e).splitlines()[0]}")
-                row += [0] * len(store_map)
-                ws.append(row)
-                continue
 
             print(f"\nChecking stock for: {name}")
 
@@ -331,7 +355,11 @@ def get_stock(url, store_id, driver):
         driver.get("https://www.microcenter.com")
         driver.add_cookie({
             'name': 'storeSelected', 'value': store_id, 'domain': '.microcenter.com', 'path': '/'})
-        driver.get(url)
+        
+        try:
+            driver.get(url)
+        except TimeoutException:
+            return 0
 
         stock_element = WebDriverWait(driver, 6).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "#pnlInventory span.inventoryCnt"))
@@ -518,8 +546,8 @@ def modify_products_window(use_original=False):
     tk.Button(win, text="Add Product", command=add_product, width=20).grid(row=2, column=0, pady=10)
     tk.Button(win, text="Remove Product", command=remove_product, width=20).grid(row=2, column=1, pady=10)
     tk.Button(win, text="Done", command=done, width=20).grid(row=3, column=0, pady=10)
-    tk.Button(win, text="Reset to Original", command=reset_to_original, width=20).grid(row=3, column=1, pady=10)
-    if not use_original:
+    if not use_original:  
+        tk.Button(win, text="Reset to Original", command=reset_to_original, width=20).grid(row=3, column=1, pady=10)
         tk.Button(win, text="Modify Original", command=lambda: modify_products_window(use_original=True), width=20).grid(row=4, column=1, pady=10)
 
     refresh()
@@ -545,7 +573,6 @@ def main():
     use_existing = messagebox.askyesno("Stock Tracker", "Would you like to edit an existing Excel file?")
 
     file_path = None
-    save_path = None
     # If the user owns the stock tracker file
     if use_existing:
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
@@ -554,15 +581,13 @@ def main():
             time.sleep(2)
             terminate()
     else:
-        save_path = filedialog.asksaveasfilename(defaultextension=".xlsx",
+        file_path = filedialog.asksaveasfilename(defaultextension=".xlsx",
                                                  filetypes=[("Excel files", "*.xlsx")],
                                                  title="Save new stock report as")
-        if not save_path:
+        if not file_path:
             messagebox.showinfo("Cancelled", "No save location selected.")
             time.sleep(2)
             terminate()
-
-    root.destroy()
         
     if use_existing:
         # Run the stock tracker and coloring
@@ -575,7 +600,8 @@ def main():
         print("Check 2")
         analyze_stock(file_path)
         print("Check 3")
-        final_message = f"Stock data added and highlighted in:\n{file_path}"
+        elapsed = time.time() - STOCK_TRACKER_START
+        final_message = f"Stock tracking completed in {elapsed:.2f} seconds"
     else:
         # If the user opts to create an independent sheet with this week's stock
         wb = Workbook()
@@ -583,14 +609,13 @@ def main():
         sheet_name = f"WK{week_number}"
         ws.title = sheet_name
         run_stock_tracker(wb, sheet_name)
-        wb.save(save_path)
-        analyze_stock(save_path)
-        final_message = f"New stock report saved as:\n{save_path}"
+        wb.save(file_path)
+        analyze_stock(file_path)
+        elapsed = time.time() - STOCK_TRACKER_START
+        final_message = f"Stock tracking completed in {elapsed:.2f} seconds"
 
-    root = Tk()
-    root.withdraw()
-    messagebox.showinfo("Done", final_message)
-    print("Check 4")
+    print(final_message)
+    os.startfile(file_path)
 
     time.sleep(2)
     terminate()
