@@ -4,7 +4,6 @@ import os
 import sys
 import json
 import tkinter as tk
-import openpyxl
 from tkinter import Tk, filedialog, simpledialog, messagebox
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -16,7 +15,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
-from concurrent.futures import ThreadPoolExecutor
 
 DEBUG_MODE = True
 
@@ -168,7 +166,7 @@ def normalize_cell_value(value):
     if val == 'NO STOCK':
         return 0
     if val == 'N/A':
-        return 'N/A'
+        return 0
     if val == '25+':
         return 25
     try:
@@ -177,11 +175,10 @@ def normalize_cell_value(value):
     except ValueError:
         return 0
     
-def analyze_stock(filename):
-    wb = load_workbook(filename)
+def analyze_stock(wb):
     sheetnames = wb.sheetnames
     
-    for i in range(2, len(sheetnames)):
+    for i in range(3, len(sheetnames)):
         prev_sheet = wb[sheetnames[i - 1]]
         curr_sheet = wb[sheetnames[i]]
 
@@ -214,8 +211,6 @@ def analyze_stock(filename):
                         cell.fill = green_fill
                     elif curr_val < prev_val:
                         cell.fill = yellow_fill
-
-    wb.save(filename)
 
 # Format the sheet
 def format_new_sheet(ws):
@@ -260,8 +255,6 @@ def product_sums(ws, category_positions):
                 return ws[merged_range.coord.split(":")[0]].value
         return cell.value
 
-
-
     for row in range(2, ws.max_row + 1):
         ws[f"AF{row}"] = f"=SUM(C{row}:AE{row})"
         ws[f"AH{row}"] = f"=COUNTIF(C{row}:AE{row}, 0)"
@@ -296,17 +289,133 @@ def product_sums(ws, category_positions):
         if total_rows:
             ws[f"AG{start_row}"] = f"=SUM({','.join(total_rows)})"
 
-def run_stock_tracker(target_wb, sheet_name):
-    global STOCK_TRACKER_START
-    STOCK_TRACKER_START = time.time()
+def prepare_chart_data(wb):
+    # Ensure Charts sheet exists in position 3
+    if len(wb.sheetnames) < 3:
+        while len(wb.sheetnames) < 3:
+            wb.create_sheet()
+    if wb.sheetnames[2] != "Charts":
+        charts_ws = wb.create_sheet("Charts")
+        wb._sheets.insert(2, wb._sheets.pop())
+    else:
+        charts_ws = wb.worksheets[2]
 
+    # Clear existing content
+    for row in charts_ws.iter_rows():
+        for cell in row:
+            cell.value = None
+
+    weekly_sheets = wb.sheetnames[3:]
+    all_categories = {}
+    model_data = {}
+    category_totals = {}
+    week_labels = []
+
+    # Collect weekly data
+    for sheetname in weekly_sheets:
+        ws = wb[sheetname]
+        week_labels.append(sheetname)
+
+        last_category = None
+
+        for row in range(2, ws.max_row + 1):
+            category_cell = ws[f"A{row}"].value
+            if category_cell:  # New category
+                last_category = category_cell.strip().lower()
+                if "cooler" in last_category:
+                    last_category = "Coolers"
+                elif "chassis" in last_category:
+                    last_category = "Chassis"
+                elif "power" in last_category:
+                    last_category = "Power Supplies"
+            elif not last_category:
+                continue  # Skip until we know category
+
+            category = last_category
+            model = ws[f"B{row}"].value
+            if not model or str(model).strip().upper().startswith("UPDATED"):
+                continue  # Skip invalid or "UPDATED" lines
+
+            # Keep order of appearance
+            if category not in all_categories:
+                all_categories[category] = []
+            if model not in all_categories[category]:
+                all_categories[category].append(model)
+
+            # Sum columns C–AE using normalize_cell_value
+            value = 0
+            for col in range(3, 31):
+                cell_val = ws.cell(row=row, column=col).value
+                norm_val = normalize_cell_value(cell_val)
+                if isinstance(norm_val, (int, float)):
+                    value += norm_val
+
+            # Store model data
+            model_data.setdefault(category, {}).setdefault(model, []).append(value)
+
+            # Store category totals
+            category_totals.setdefault(category, [0] * len(weekly_sheets))
+            category_totals[category][len(week_labels) - 1] += value
+
+    # Write product data per category
+    current_row = 1
+    for category, models in all_categories.items():
+        charts_ws.cell(row=current_row, column=1).value = f"{category} Stock Trends Data"
+        start_row = current_row + 1
+        charts_ws.cell(row=start_row, column=1).value = "Week"
+
+        # Week labels
+        for i, week in enumerate(week_labels):
+            charts_ws.cell(row=start_row+i+1, column=1).value = week
+
+        # Model data
+        for j, model in enumerate(models):
+            charts_ws.cell(row=start_row, column=j+2).value = model
+            model_values = model_data[category].get(model, [])
+            for i, value in enumerate(model_values):
+                charts_ws.cell(row=start_row+i+1, column=j+2).value = value
+
+        current_row = start_row + len(week_labels) + 3
+
+    # Write category totals
+    charts_ws.cell(row=current_row, column=1).value = "Category Totals Data"
+    start_row = current_row + 1
+    charts_ws.cell(row=start_row, column=1).value = "Week"
+    sorted_categories = sorted(category_totals)
+    for i, cat in enumerate(sorted_categories):
+        charts_ws.cell(row=start_row, column=i+2).value = cat
+    for w, week in enumerate(week_labels):
+        charts_ws.cell(row=start_row+w+1, column=1).value = week
+        for i, cat in enumerate(sorted_categories):
+            charts_ws.cell(row=start_row+w+1, column=i+2).value = category_totals[cat][w]
+    current_row = start_row + len(week_labels) + 3
+
+    # Write store totals
+    charts_ws.cell(row=current_row, column=1).value = "Store Totals Data"
+    start_row = current_row + 1
+    charts_ws.cell(row=start_row, column=1).value = "Week"
+    stores = list(store_map.values())
+    for i, store in enumerate(stores):
+        charts_ws.cell(row=start_row, column=i+2).value = store
+    for w, sheetname in enumerate(weekly_sheets):
+        ws = wb[sheetname]
+        charts_ws.cell(row=start_row+w+1, column=1).value = sheetname
+        for i, store in enumerate(stores):
+            store_total = 0
+            for row in range(2, ws.max_row + 1):
+                val = ws.cell(row=row, column=3+i).value
+                norm_val = normalize_cell_value(val)
+                if isinstance(norm_val, (int, float)):
+                    store_total += norm_val
+            charts_ws.cell(row=start_row+w+1, column=i+2).value = store_total
+
+def run_stock_tracker(target_wb, sheet_name):
     # Setup Selenium driver
     options = Options()
     options.add_argument("--headless")
     if DEBUG_MODE:
         options.add_argument("--enable-logging")   
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.set_page_load_timeout(6)
 
     # Setup worksheet
     ws = target_wb.create_sheet(title=sheet_name)
@@ -355,13 +464,9 @@ def get_stock(url, store_id, driver):
         driver.get("https://www.microcenter.com")
         driver.add_cookie({
             'name': 'storeSelected', 'value': store_id, 'domain': '.microcenter.com', 'path': '/'})
-        
-        try:
-            driver.get(url)
-        except TimeoutException:
-            return 0
+        driver.get(url)
 
-        stock_element = WebDriverWait(driver, 6).until(
+        stock_element = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "#pnlInventory span.inventoryCnt"))
         )
 
@@ -588,20 +693,17 @@ def main():
             messagebox.showinfo("Cancelled", "No save location selected.")
             time.sleep(2)
             terminate()
-        
+
+    global STOCK_TRACKER_START
+    STOCK_TRACKER_START = time.time()
+
     if use_existing:
         # Run the stock tracker and coloring
         wb = load_workbook(file_path)
         sheet_name = f"WK{week_number}"
-        process_add_products_sheet(wb)
-        run_stock_tracker(wb, sheet_name)
-        print("Check 1")
-        wb.save(file_path)
-        print("Check 2")
-        analyze_stock(file_path)
-        print("Check 3")
-        elapsed = time.time() - STOCK_TRACKER_START
-        final_message = f"Stock tracking completed in {elapsed:.2f} seconds"
+        prepare_chart_data(wb)
+        # process_add_products_sheet(wb)
+        # run_stock_tracker(wb, sheet_name)
     else:
         # If the user opts to create an independent sheet with this week's stock
         wb = Workbook()
@@ -609,11 +711,12 @@ def main():
         sheet_name = f"WK{week_number}"
         ws.title = sheet_name
         run_stock_tracker(wb, sheet_name)
-        wb.save(file_path)
-        analyze_stock(file_path)
-        elapsed = time.time() - STOCK_TRACKER_START
-        final_message = f"Stock tracking completed in {elapsed:.2f} seconds"
 
+    analyze_stock(wb)
+    wb.save(file_path)
+    elapsed = time.time() - STOCK_TRACKER_START
+    processed_time = f"{int(elapsed // 3600)} Hours, {int((elapsed % 3600) // 60)} Minutes, {int((elapsed % 3600) % 60)} Seconds"
+    final_message = f"Stock tracking completed in {processed_time}"
     print(final_message)
     os.startfile(file_path)
 
