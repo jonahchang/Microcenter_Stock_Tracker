@@ -15,6 +15,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 
 DEBUG_MODE = True
 
@@ -217,7 +218,7 @@ def format_new_sheet(ws):
     category_positions = {}
     row_start = 2
     for category, products in [("Power Supply", power_supplies),
-                               ("Cooler", coolers),
+                               ("AIO Liquid CPU Cooler", coolers),
                                ("Chassis", chassis),
                                ("Miscellaneous", miscellaneous)]:
         if not products:
@@ -320,42 +321,45 @@ def prepare_chart_data(wb):
 
         for row in range(2, ws.max_row + 1):
             category_cell = ws[f"A{row}"].value
-            if category_cell:  # New category
-                last_category = category_cell.strip().lower()
-                if "cooler" in last_category:
+            if category_cell and category_cell.strip():
+                last_category = category_cell.strip()
+                # Normalize similar category names
+                if "cooler" in last_category.lower():
                     last_category = "Coolers"
-                elif "chassis" in last_category:
+                elif "chassis" in last_category.lower():
                     last_category = "Chassis"
-                elif "power" in last_category:
+                elif "power" in last_category.lower():
                     last_category = "Power Supplies"
             elif not last_category:
-                continue  # Skip until we know category
+                continue  # No category yet
 
             category = last_category
             model = ws[f"B{row}"].value
             if not model or str(model).strip().upper().startswith("UPDATED"):
-                continue  # Skip invalid or "UPDATED" lines
+                continue
 
-            # Keep order of appearance
+            # Keep order of models in category
             if category not in all_categories:
                 all_categories[category] = []
             if model not in all_categories[category]:
                 all_categories[category].append(model)
 
-            # Sum columns C–AE using normalize_cell_value
-            value = 0
-            for col in range(3, 31):
+            # Sum columns C–AE
+            total_value = 0
+            for col in range(3, 32):  # C=3, AE=30
                 cell_val = ws.cell(row=row, column=col).value
-                norm_val = normalize_cell_value(cell_val)
-                if isinstance(norm_val, (int, float)):
-                    value += norm_val
+                if isinstance(cell_val, (int, float)):
+                    total_value += cell_val
+                    col_letter = get_column_letter(col)
+                    if sheetname == "WK26" and row < 5:
+                        print(f"DEBUG: Week={sheetname}, Cell={col_letter}{row}, Stock={cell_val}")
 
             # Store model data
-            model_data.setdefault(category, {}).setdefault(model, []).append(value)
+            model_data.setdefault(category, {}).setdefault(model, []).append(total_value)
 
             # Store category totals
             category_totals.setdefault(category, [0] * len(weekly_sheets))
-            category_totals[category][len(week_labels) - 1] += value
+            category_totals[category][len(week_labels) - 1] += total_value
 
     # Write product data per category
     current_row = 1
@@ -364,16 +368,14 @@ def prepare_chart_data(wb):
         start_row = current_row + 1
         charts_ws.cell(row=start_row, column=1).value = "Week"
 
-        # Week labels
         for i, week in enumerate(week_labels):
-            charts_ws.cell(row=start_row+i+1, column=1).value = week
+            charts_ws.cell(row=start_row + i + 1, column=1).value = week
 
-        # Model data
         for j, model in enumerate(models):
-            charts_ws.cell(row=start_row, column=j+2).value = model
+            charts_ws.cell(row=start_row, column=j + 2).value = model
             model_values = model_data[category].get(model, [])
             for i, value in enumerate(model_values):
-                charts_ws.cell(row=start_row+i+1, column=j+2).value = value
+                charts_ws.cell(row=start_row + i + 1, column=j + 2).value = value
 
         current_row = start_row + len(week_labels) + 3
 
@@ -381,13 +383,16 @@ def prepare_chart_data(wb):
     charts_ws.cell(row=current_row, column=1).value = "Category Totals Data"
     start_row = current_row + 1
     charts_ws.cell(row=start_row, column=1).value = "Week"
-    sorted_categories = sorted(category_totals)
-    for i, cat in enumerate(sorted_categories):
-        charts_ws.cell(row=start_row, column=i+2).value = cat
+    # Preserve category order as first encountered
+    ordered_categories = list(category_totals.keys())
+    for i, cat in enumerate(ordered_categories):
+        charts_ws.cell(row=start_row, column=i + 2).value = cat
+
     for w, week in enumerate(week_labels):
-        charts_ws.cell(row=start_row+w+1, column=1).value = week
-        for i, cat in enumerate(sorted_categories):
-            charts_ws.cell(row=start_row+w+1, column=i+2).value = category_totals[cat][w]
+        charts_ws.cell(row=start_row + w + 1, column=1).value = week
+        for i, cat in enumerate(ordered_categories):
+            charts_ws.cell(row=start_row + w + 1, column=i + 2).value = category_totals[cat][w]
+
     current_row = start_row + len(week_labels) + 3
 
     # Write store totals
@@ -396,18 +401,17 @@ def prepare_chart_data(wb):
     charts_ws.cell(row=start_row, column=1).value = "Week"
     stores = list(store_map.values())
     for i, store in enumerate(stores):
-        charts_ws.cell(row=start_row, column=i+2).value = store
+        charts_ws.cell(row=start_row, column=i + 2).value = store
     for w, sheetname in enumerate(weekly_sheets):
         ws = wb[sheetname]
-        charts_ws.cell(row=start_row+w+1, column=1).value = sheetname
+        charts_ws.cell(row=start_row + w + 1, column=1).value = sheetname
         for i, store in enumerate(stores):
             store_total = 0
             for row in range(2, ws.max_row + 1):
-                val = ws.cell(row=row, column=3+i).value
-                norm_val = normalize_cell_value(val)
-                if isinstance(norm_val, (int, float)):
-                    store_total += norm_val
-            charts_ws.cell(row=start_row+w+1, column=i+2).value = store_total
+                val = ws.cell(row=row, column=3 + i).value
+                if isinstance(val, (int, float)):
+                    store_total += val
+            charts_ws.cell(row=start_row + w + 1, column=i + 2).value = store_total
 
 def run_stock_tracker(target_wb, sheet_name):
     # Setup Selenium driver
