@@ -706,8 +706,8 @@ def main():
         wb = load_workbook(file_path)
         sheet_name = f"WK{week_number}"
         prepare_chart_data(wb)
-        # process_add_products_sheet(wb)
-        # run_stock_tracker(wb, sheet_name)
+        process_add_products_sheet(wb)
+        run_stock_tracker(wb, sheet_name)
     else:
         # If the user opts to create an independent sheet with this week's stock
         wb = Workbook()
