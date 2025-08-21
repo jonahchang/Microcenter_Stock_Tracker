@@ -15,10 +15,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
-from urllib.request import urlopen
-from bs4 import BeautifulSoup
-import random
+from openpyxl.utils import get_column_letter 
 
 DEBUG_MODE = True
 
@@ -451,13 +448,6 @@ def run_stock_tracker(target_wb, sheet_name):
                 row.append(stock)
             ws.append(row)
 
-            if DEBUG_MODE:
-                try:
-                    target_wb.save("debug_autosave.xlsx")
-                    print(f"Autosaved progress after {name}")
-                except Exception as e:
-                    print(f"Error autosaving workbook: {e}")
-
     category_positions = format_new_sheet(ws)
 
     product_sums(ws, category_positions)
@@ -492,73 +482,6 @@ def get_stock(url, store_id, driver):
 def terminate():
     sys.exit()
 
-def test_get_stock(url, store_id):
-    try:
-        store_url = f"{url}?storeid={store_id}"
-        html = urlopen(store_url).read().decode("utf-8")
-        soup = BeautifulSoup(html, "html.parser")
-        stock_el = soup.select_one("#pnlInventory span.inventoryCnt")
-
-        if not stock_el:
-            return 0  # No stock section = out of stock
-
-        stock_text = stock_el.get_text(strip=True).upper()
-
-        # Debugging: show raw text
-        print(f"[DEBUG] Store {store_id} stock text: '{stock_text}'")
-
-        # Check for "25+" first
-        if stock_text.startswith("25+"):
-            return "25+"
-
-        # Extract leading number
-        match = re.match(r"(\d+)", stock_text)
-        if match:
-            num = int(match.group(1))
-            return num if num > 0 else 0
-
-        return 0
-    except Exception as e:
-        print(f"Error fetching stock for store {store_id}: {e}")
-        return 0
-
-def test_stock(wb, sheet_name):
-    # Setup worksheet
-    ws = wb.create_sheet(title=sheet_name)
-    headers = ["Product Category", "Model"] + list(store_map.values()) + ["INDIVIDUAL TOTALS", "CATEGORY TOTALS", "OUT OF STOCK"]
-    ws.append(headers)
-
-    request_count = 0
-
-    # Start scanning for URLs
-    for category, products in [("Power Supply", power_supplies),
-                               ("Cooler", coolers),
-                               ("Chassis", chassis),
-                               ("Miscellaneous", miscellaneous)]:
-        for name, url in products.items():
-            if not url:
-                continue
-            row = [category, name]
-
-            print(f"\nChecking stock for: {name}")
-
-            for store_id, store_name in store_map.items():
-                stock = test_get_stock(url, store_id)
-                print(f"{store_name}: {stock}")
-                row.append(stock)
-                time.sleep(random.uniform(2, 3))
-                request_count += 1
-
-                if request_count % random.randint(15, 25) == 0:
-                    pause = random.uniform(10, 15)
-                    print(f"[PAUSE] Taking a short break for {pause:.1f} seconds...")
-                    time.sleep(pause)
-
-            ws.append(row)
-
-    category_positions = format_new_sheet(ws)
-
-    product_sums(ws, category_positions)
 
 # Prompt user to add or remove products
 def modify_products_window(use_original=False):
@@ -731,21 +654,7 @@ def modify_products_window(use_original=False):
     refresh()
     win.mainloop()
 
-def test_single_product():
-    url = "https://www.microcenter.com/product/666611/asus-rog-thor-1000-watt-80-plus-platinum-atx-fully-modular-power-supply"  # Example URL
-    store_id = "195"
-    store_url = f"{url}?storeid={store_id}"
-    html = urlopen(store_url).read().decode("utf-8")
-    soup = BeautifulSoup(html, "html.parser")
-    stock = soup.select_one("#pnlInventory span.inventoryCnt")
-
-    if stock:
-        print("Stock found in HTML:", stock.get_text(strip=True))
-    else:
-        print("Stock NOT in HTML — requires JavaScript")
-
 def main():
-    test_single_product()
     load_products()
     final_message = "Error"
 
@@ -781,6 +690,8 @@ def main():
             time.sleep(2)
             terminate()
 
+    analyze_only = messagebox.askyesno("Analyze Only", "Would you like to only run the highlighting/labeling program?")
+
     global STOCK_TRACKER_START
     STOCK_TRACKER_START = time.time()
 
@@ -789,8 +700,8 @@ def main():
         wb = load_workbook(file_path)
         sheet_name = f"WK{week_number}"
         process_add_products_sheet(wb)
-        # run_stock_tracker(wb, sheet_name)
-        test_stock(wb, sheet_name)
+        if not analyze_only:
+            run_stock_tracker(wb, sheet_name)
         prepare_chart_data(wb)
     else:
         # If the user opts to create an independent sheet with this week's stock
