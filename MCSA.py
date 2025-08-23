@@ -350,7 +350,6 @@ def prepare_chart_data(wb):
                 cell_val = ws.cell(row=row, column=col).value
                 if isinstance(cell_val, (int, float)):
                     total_value += cell_val
-                    col_letter = get_column_letter(col)
 
             # Store model data
             model_data.setdefault(category, {}).setdefault(model, []).append(total_value)
@@ -364,52 +363,54 @@ def prepare_chart_data(wb):
     for category, models in all_categories.items():
         charts_ws.cell(row=current_row, column=1).value = f"{category} Stock Trends Data"
         start_row = current_row + 1
-        charts_ws.cell(row=start_row, column=1).value = "Week"
+        charts_ws.cell(row=start_row, column=1).value = "Model"
 
         for i, week in enumerate(week_labels):
-            charts_ws.cell(row=start_row + i + 1, column=1).value = week
+            charts_ws.cell(row=start_row, column=i + 2).value = week
 
         for j, model in enumerate(models):
-            charts_ws.cell(row=start_row, column=j + 2).value = model
+            charts_ws.cell(row=start_row + j + 1, column=1).value = model
             model_values = model_data[category].get(model, [])
             for i, value in enumerate(model_values):
-                charts_ws.cell(row=start_row + i + 1, column=j + 2).value = value
+                charts_ws.cell(row=start_row + j + 1, column=i + 2).value = value
 
-        current_row = start_row + len(week_labels) + 3
+        current_row = start_row + len(models) + 3
 
     # Write category totals
     charts_ws.cell(row=current_row, column=1).value = "Category Totals Data"
     start_row = current_row + 1
-    charts_ws.cell(row=start_row, column=1).value = "Week"
+    charts_ws.cell(row=start_row, column=1).value = "Category"
     # Preserve category order as first encountered
     ordered_categories = list(category_totals.keys())
-    for i, cat in enumerate(ordered_categories):
-        charts_ws.cell(row=start_row, column=i + 2).value = cat
+    for i, week in enumerate(week_labels):
+        charts_ws.cell(row=start_row, column=i + 2).value = week
 
-    for w, week in enumerate(week_labels):
-        charts_ws.cell(row=start_row + w + 1, column=1).value = week
-        for i, cat in enumerate(ordered_categories):
-            charts_ws.cell(row=start_row + w + 1, column=i + 2).value = category_totals[cat][w]
+    for w, cat in enumerate(ordered_categories):
+        charts_ws.cell(row=start_row + w + 1, column=1).value = cat
+        for i, week in enumerate(week_labels):
+            charts_ws.cell(row=start_row + w + 1, column=i + 2).value = category_totals[cat][i]
 
-    current_row = start_row + len(week_labels) + 3
+    current_row = start_row + len(ordered_categories) + 3
 
     # Write store totals
     charts_ws.cell(row=current_row, column=1).value = "Store Totals Data"
     start_row = current_row + 1
-    charts_ws.cell(row=start_row, column=1).value = "Week"
+    charts_ws.cell(row=start_row, column=1).value = "Store"
+    for j, week in enumerate(week_labels):
+        charts_ws.cell(row=start_row, column=j + 2).value = week
+
+    # Each store becomes a row
     stores = list(store_map.values())
     for i, store in enumerate(stores):
-        charts_ws.cell(row=start_row, column=i + 2).value = store
-    for w, sheetname in enumerate(weekly_sheets):
-        ws = wb[sheetname]
-        charts_ws.cell(row=start_row + w + 1, column=1).value = sheetname
-        for i, store in enumerate(stores):
+        charts_ws.cell(row=start_row + i + 1, column=1).value = store
+        for j, sheetname in enumerate(weekly_sheets):
+            ws = wb[sheetname]
             store_total = 0
             for row in range(2, ws.max_row + 1):
                 val = ws.cell(row=row, column=3 + i).value
                 if isinstance(val, (int, float)):
                     store_total += val
-            charts_ws.cell(row=start_row + w + 1, column=i + 2).value = store_total
+            charts_ws.cell(row=start_row + i + 1, column=j + 2).value = store_total
 
 def run_stock_tracker(target_wb, sheet_name):
     # Setup Selenium driver
