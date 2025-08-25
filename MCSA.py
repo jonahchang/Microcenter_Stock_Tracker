@@ -5,17 +5,16 @@ import sys
 import json
 import tkinter as tk
 from tkinter import Tk, filedialog, simpledialog, messagebox
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
-from openpyxl.utils import get_column_letter 
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
+import random
 
 DEBUG_MODE = True
 
@@ -360,6 +359,7 @@ def prepare_chart_data(wb):
 
     # Write product data per category
     current_row = 1
+
     for category, models in all_categories.items():
         charts_ws.cell(row=current_row, column=1).value = f"{category} Stock Trends Data"
         start_row = current_row + 1
@@ -373,6 +373,12 @@ def prepare_chart_data(wb):
             model_values = model_data[category].get(model, [])
             for i, value in enumerate(model_values):
                 charts_ws.cell(row=start_row + j + 1, column=i + 2).value = value
+
+        # Create a table for this category
+        end_row = start_row + len(models)
+        end_col = 1 + len(week_labels)
+        ref = f"A{start_row}:{chr(64+end_col)}{end_row}"
+        add_or_update_table(charts_ws, f"{category.replace(' ', '')}Table", ref)
 
         current_row = start_row + len(models) + 3
 
@@ -389,6 +395,11 @@ def prepare_chart_data(wb):
         charts_ws.cell(row=start_row + w + 1, column=1).value = cat
         for i, week in enumerate(week_labels):
             charts_ws.cell(row=start_row + w + 1, column=i + 2).value = category_totals[cat][i]
+
+    end_row = start_row + len(ordered_categories)
+    end_col = 1 + len(week_labels)
+    ref = f"A{start_row}:{chr(64+end_col)}{end_row}"
+    add_or_update_table(charts_ws, "CategoryTotalsTable", ref)
 
     current_row = start_row + len(ordered_categories) + 3
 
@@ -412,13 +423,41 @@ def prepare_chart_data(wb):
                     store_total += val
             charts_ws.cell(row=start_row + i + 1, column=j + 2).value = store_total
 
+    end_row = start_row + len(stores)
+    end_col = 1 + len(week_labels)
+    ref = f"A{start_row}:{chr(64+end_col)}{end_row}"
+    add_or_update_table(charts_ws, "StoreTotalsTable", ref)
+
+def add_or_update_table(ws, table_name, ref):
+    """Add a table if it doesn’t exist, or update ref if it does (handles dict vs list)."""
+
+    # Case 1: _tables is a dict {name: Table}
+    if isinstance(ws._tables, dict):
+        if table_name in ws._tables:
+            ws._tables[table_name].ref = ref
+            return
+    # Case 2: _tables is a list [Table, Table, ...]
+    else:
+        for t in ws._tables:
+            if getattr(t, "name", None) == table_name:
+                t.ref = ref
+                return
+
+    # If not found → create new table
+    tab = Table(displayName=table_name, ref=ref)
+    style = TableStyleInfo(name="TableStyleMedium9", showRowStripes=True, showColumnStripes=False)
+    tab.tableStyleInfo = style
+    ws.add_table(tab)
+
 def run_stock_tracker(target_wb, sheet_name):
     # Setup Selenium driver
-    options = Options()
-    options.add_argument("--headless")
-    if DEBUG_MODE:
-        options.add_argument("--enable-logging")   
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options = uc.ChromeOptions()
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                         "AppleWebKit/537.36 (KHTML, like Gecko) "
+                         "Chrome/120.0.0.0 Safari/537.36")
+    driver = uc.Chrome(options=options)
+    driver.maximize_window()
 
     # Setup worksheet
     ws = target_wb.create_sheet(title=sheet_name)
@@ -459,14 +498,49 @@ def get_stock(url, store_id, driver):
     try:
         driver.get("https://www.microcenter.com")
         driver.add_cookie({
-            'name': 'storeSelected', 'value': store_id, 'domain': '.microcenter.com', 'path': '/'})
+            'name': 'storeSelected',
+            'value': store_id,
+            'domain': '.microcenter.com',
+            'path': '/'
+            })
+        
         driver.get(url)
+        human_delay(0.5, 1.5)
 
-        stock_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "#pnlInventory span.inventoryCnt"))
+        try:
+            stock_container = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.ID, "pnlInventory"))
+            )
+            if DEBUG_MODE:
+                print("=== pnlInventory found ===")
+        except TimeoutException:
+            if DEBUG_MODE:
+                print("pnlInventory not found, trying fallback .inventoryCnt")
+            stock_container = None
+
+        # Fallback: wait for any inventoryCnt
+        stock_element = WebDriverWait(driver, 20).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "span.inventoryCnt"))
         )
+        human_delay(0.5, 1.5)
+        if DEBUG_MODE:
+            print("stock_element found:", stock_element.get_attribute("outerHTML"))
 
-        stock_text = stock_element.text.strip()
+        # Extract text content only
+        stock_text = driver.execute_script(
+            """
+            let el = arguments[0];
+            for (let node of el.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent.trim();
+                }
+            }
+            return "";
+            """,
+            stock_element
+        )
+        if DEBUG_MODE:
+            print("Parsed stock_text:", stock_text)
 
         if "25+" in stock_text:
             return "25+"
@@ -479,6 +553,13 @@ def get_stock(url, store_id, driver):
         if DEBUG_MODE:
             print(f"get_stock failed for {url} at store {store_id}: {str(e).splitlines()[0]}")
         return 0
+    
+def human_delay(min_seconds=1.0, max_seconds=3.0):
+    """Random delay to mimic human browsing."""
+    delay = random.uniform(min_seconds, max_seconds)
+    if DEBUG_MODE:
+        print(f"Human-like delay for {delay:.2f} seconds")
+    time.sleep(delay)
 
 def terminate():
     sys.exit()
@@ -691,7 +772,7 @@ def main():
             time.sleep(2)
             terminate()
 
-    analyze_only = messagebox.askyesno("Analyze Only", "Would you like to only run the highlighting/labeling program?")
+    analyze_only = messagebox.askyesno("Analyze Only", "Would you like to ONLY run the highlighting/labeling program?")
 
     global STOCK_TRACKER_START
     STOCK_TRACKER_START = time.time()
