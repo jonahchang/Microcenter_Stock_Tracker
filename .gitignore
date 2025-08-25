@@ -1,4 +1,5 @@
-/dist/
+/dist/MC_original_products
+/dist/MC_products
 /build/
 *.spec
 /__pycache__/
