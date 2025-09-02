@@ -508,7 +508,7 @@ def get_stock(url, store_id, driver):
         human_delay(0.5, 1.5)
 
         try:
-            stock_container = WebDriverWait(driver, 15).until(
+            stock_container = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "pnlInventory"))
             )
             if DEBUG_MODE:
@@ -518,27 +518,34 @@ def get_stock(url, store_id, driver):
                 print("pnlInventory not found, trying fallback .inventoryCnt")
             stock_container = None
 
-        # Fallback: wait for any inventoryCnt
-        stock_element = WebDriverWait(driver, 20).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, "span.inventoryCnt"))
-        )
+        try:
+            # Primary attempt: find OUT OF STOCK
+            sold_out_element = WebDriverWait(driver, 3).until(
+                EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'SOLD OUT')]"))
+            )
+            if DEBUG_MODE:
+                print("Found SOLD OUT element:", sold_out_element.get_attribute("outerHTML"))
+            return 0  # Explicit out-of-stock
+        except TimeoutException:
+                # Second: check for inventory count
+            try:
+                stock_element = WebDriverWait(driver, 5).until(
+                    EC.visibility_of_element_located((By.CSS_SELECTOR, "span.inventoryCnt"))
+                )
+                stock_text = stock_element.text.strip()
+                if DEBUG_MODE:
+                    print("Found inventoryCnt element:", stock_text)
+            except TimeoutException:
+                if DEBUG_MODE:
+                    print("No stock element found, returning 0")
+                return 0
+            
         human_delay(0.5, 1.5)
         if DEBUG_MODE:
             print("stock_element found:", stock_element.get_attribute("outerHTML"))
 
         # Extract text content only
-        stock_text = driver.execute_script(
-            """
-            let el = arguments[0];
-            for (let node of el.childNodes) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    return node.textContent.trim();
-                }
-            }
-            return "";
-            """,
-            stock_element
-        )
+        stock_text = stock_element.text.strip()
         if DEBUG_MODE:
             print("Parsed stock_text:", stock_text)
 
