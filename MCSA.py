@@ -377,8 +377,10 @@ def prepare_chart_data(wb):
         # Create a table for this category
         end_row = start_row + len(models)
         end_col = 1 + len(week_labels)
-        ref = f"A{start_row}:{chr(64+end_col)}{end_row}"
-        add_or_update_table(charts_ws, f"{category.replace(' ', '')}Table", ref)
+        end_col_letter = get_column_letter(end_col)
+        ref = f"A{start_row}:{end_col_letter}{end_row}"
+        if end_row > start_row:
+            add_or_update_table(charts_ws, f"{category.replace(' ', '')}Table", ref)
 
         current_row = start_row + len(models) + 3
 
@@ -398,8 +400,11 @@ def prepare_chart_data(wb):
 
     end_row = start_row + len(ordered_categories)
     end_col = 1 + len(week_labels)
-    ref = f"A{start_row}:{chr(64+end_col)}{end_row}"
-    add_or_update_table(charts_ws, "CategoryTotalsTable", ref)
+    end_col_letter = get_column_letter(end_col)
+    ref = f"A{start_row}:{end_col_letter}{end_row}"
+    if end_row > start_row:
+        add_or_update_table(charts_ws, "CategoryTotalsTable", ref)
+    
 
     current_row = start_row + len(ordered_categories) + 3
 
@@ -425,26 +430,41 @@ def prepare_chart_data(wb):
 
     end_row = start_row + len(stores)
     end_col = 1 + len(week_labels)
-    ref = f"A{start_row}:{chr(64+end_col)}{end_row}"
-    add_or_update_table(charts_ws, "StoreTotalsTable", ref)
+    end_col_letter = get_column_letter(end_col)
+    ref = f"A{start_row}:{end_col_letter}{end_row}"
+    if end_row > start_row:
+        add_or_update_table(charts_ws, "StoreTotalsTable", ref)
+    
 
-def add_or_update_table(ws, table_name, ref):
-    """Add a table if it doesn’t exist, or update ref if it does (handles dict vs list)."""
+def add_or_update_table(ws, base_name, ref):
+    """Add a table if it doesn't exist, or update ref if it does, ensuring uniqueness."""
 
-    # Case 1: _tables is a dict {name: Table}
+    # Sanitize name
+    safe_name = "".join(c if c.isalnum() else "_" for c in base_name)
+    safe_name = safe_name[:200].lstrip("0123456789")  # Excel rules: no leading digit, < 255 chars
+
+    # Collect existing names
     if isinstance(ws._tables, dict):
-        if table_name in ws._tables:
-            ws._tables[table_name].ref = ref
-            return
-    # Case 2: _tables is a list [Table, Table, ...]
+        existing_tables = ws._tables
+        existing_names = set(existing_tables.keys())
     else:
-        for t in ws._tables:
-            if getattr(t, "name", None) == table_name:
-                t.ref = ref
-                return
+        existing_tables = {t.name: t for t in ws._tables}
+        existing_names = set(existing_tables.keys())
 
-    # If not found → create new table
-    tab = Table(displayName=table_name, ref=ref)
+    # Case 1: Update existing table with same name
+    if safe_name in existing_names:
+        existing_tables[safe_name].ref = ref
+        return
+
+    # Case 2: Generate unique name if needed
+    unique_name = safe_name
+    counter = 1
+    while unique_name in existing_names:
+        unique_name = f"{safe_name}_{counter}"
+        counter += 1
+
+    # Case 3: Create new table with unique name
+    tab = Table(displayName=unique_name, ref=ref)
     style = TableStyleInfo(name="TableStyleMedium9", showRowStripes=True, showColumnStripes=False)
     tab.tableStyleInfo = style
     ws.add_table(tab)
