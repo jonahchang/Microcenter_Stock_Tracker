@@ -14,6 +14,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.utils import range_boundaries
 import random
 
 DEBUG_MODE = True
@@ -64,7 +65,7 @@ def load_products():
                     "GT502 TUF GAMING CASE/WHT": "https://www.microcenter.com/product/662254/asus-tuf-gaming-gt502-tempered-glass-atx-mid-tower-computer-case-white",
                     "GT501 TUF GAMING CASE/GRY/WITH HANDLE": "https://www.microcenter.com/product/601243/asus-tuf-gaming-gt501-rgb-tempered-glass-atx-mid-tower-computer-case",
                     "TUF GAMING GT302 ARGB BLACK": "https://www.microcenter.com/product/679946/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-black",
-                    "TUF GAMING GT302 ARGB  WHT": "https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white",
+                    "TUF GAMING GT302 ARGB WHT": "https://www.microcenter.com/product/679945/asus-tuf-gaming-gt302-argb-tempered-glass-atx-mid-tower-computer-case-white",
                     "A31 PLUS/BK/TG/ARGB// ": "https://www.microcenter.com/product/690543/asus-a31-plus-tempered-glass-atx-mid-tower-computer-case-black",
                     "AP201 ASUS PRIME CASE MESH": "https://www.microcenter.com/product/651914/asus-prime-ap201-microatx-mini-tower-computer-case-black",
                     "AP201 ASUS PRIME CASE MESH WHITE EDITION": "https://www.microcenter.com/product/651917/asus-prime-ap201-microatx-mini-tower-computer-case-white"}
@@ -439,32 +440,27 @@ def prepare_chart_data(wb):
 def add_or_update_table(ws, base_name, ref):
     """Add a table if it doesn't exist, or update ref if it does, ensuring uniqueness."""
 
+    min_col, min_row, max_col, max_row = range_boundaries(ref)
+    if max_row - min_row < 1:   # only header, no data
+        return  # skip invalid table
+
     # Sanitize name
     safe_name = "".join(c if c.isalnum() else "_" for c in base_name)
     safe_name = safe_name[:200].lstrip("0123456789")  # Excel rules: no leading digit, < 255 chars
 
-    # Collect existing names
+    # Collect existing tables
     if isinstance(ws._tables, dict):
         existing_tables = ws._tables
-        existing_names = set(existing_tables.keys())
     else:
         existing_tables = {t.name: t for t in ws._tables}
-        existing_names = set(existing_tables.keys())
 
     # Case 1: Update existing table with same name
-    if safe_name in existing_names:
+    if safe_name in existing_tables:
         existing_tables[safe_name].ref = ref
         return
 
-    # Case 2: Generate unique name if needed
-    unique_name = safe_name
-    counter = 1
-    while unique_name in existing_names:
-        unique_name = f"{safe_name}_{counter}"
-        counter += 1
-
     # Case 3: Create new table with unique name
-    tab = Table(displayName=unique_name, ref=ref)
+    tab = Table(displayName=safe_name, ref=ref)
     style = TableStyleInfo(name="TableStyleMedium9", showRowStripes=True, showColumnStripes=False)
     tab.tableStyleInfo = style
     ws.add_table(tab)
